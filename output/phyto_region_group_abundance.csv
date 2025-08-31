@@ -1,0 +1,103 @@
+sample_date,region,p_group,phyto_total
+2017-09-03,Mackay,Dinoflagellates,80
+2017-09-03,Mackay,Other / Unidentified,2399150
+2017-09-04,Mackay,Dinoflagellates,180
+2017-09-04,Mackay,Other / Unidentified,628080
+2017-10-20,Mackay,Dinoflagellates,30
+2017-10-20,Mackay,Other / Unidentified,24490
+2017-10-21,Mackay,Dinoflagellates,110
+2017-10-21,Mackay,Other / Unidentified,52150
+2017-10-22,Mackay,Dinoflagellates,10
+2017-10-22,Mackay,Other / Unidentified,26480
+2017-11-18,Bowen,Dinoflagellates,160
+2017-11-18,Bowen,Other flagellates / minor groups,10
+2017-11-18,Bowen,Other / Unidentified,132610
+2017-11-19,Bowen,Dinoflagellates,20
+2017-11-19,Bowen,Other / Unidentified,23040
+2017-12-01,Mackay,Dinoflagellates,50
+2017-12-01,Mackay,Other / Unidentified,31650
+2017-12-02,Mackay,Cyanobacteria,170
+2017-12-02,Mackay,Dinoflagellates,260
+2017-12-02,Mackay,Other / Unidentified,467180
+2017-12-03,Mackay,Dinoflagellates,50
+2017-12-03,Mackay,Other / Unidentified,32090
+2017-12-20,Bowen,Dinoflagellates,1140
+2017-12-20,Bowen,Other / Unidentified,120060
+2018-01-31,Mackay,Dinoflagellates,480
+2018-01-31,Mackay,Other flagellates / minor groups,100
+2018-01-31,Mackay,Other / Unidentified,285720
+2018-02-01,Mackay,Dinoflagellates,530
+2018-02-01,Mackay,Other flagellates / minor groups,30
+2018-02-01,Mackay,Other / Unidentified,345120
+2018-02-20,Bowen,Dinoflagellates,770
+2018-02-20,Bowen,Other / Unidentified,180440
+2018-03-15,Weipa,Dinoflagellates,200
+2018-03-15,Weipa,Other / Unidentified,78380
+2018-03-16,Weipa,Dinoflagellates,240
+2018-03-16,Weipa,Other / Unidentified,129160
+2018-04-19,Weipa,Dinoflagellates,60
+2018-04-19,Weipa,Other / Unidentified,195410
+2018-04-20,Weipa,Dinoflagellates,160
+2018-04-20,Weipa,Other / Unidentified,59850
+2018-08-17,Bowen,Dinoflagellates,450
+2018-08-17,Bowen,Other / Unidentified,124350
+2018-08-18,Bowen,Dinoflagellates,60
+2018-08-18,Bowen,Other / Unidentified,42790
+2018-08-28,Mackay,Dinoflagellates,120
+2018-08-28,Mackay,Other / Unidentified,96020
+2018-08-30,Mackay,Dinoflagellates,520
+2018-08-30,Mackay,Other / Unidentified,306020
+2018-08-31,Mackay,Dinoflagellates,110
+2018-08-31,Mackay,Other / Unidentified,22360
+2018-09-10,Weipa,Dinoflagellates,570
+2018-09-10,Weipa,Other flagellates / minor groups,10
+2018-09-10,Weipa,Other / Unidentified,247990
+2018-11-17,Bowen,Dinoflagellates,15
+2018-11-17,Bowen,Other / Unidentified,5972
+2018-11-18,Bowen,Dinoflagellates,16
+2018-11-18,Bowen,Other / Unidentified,1874
+2018-11-29,Weipa,Dinoflagellates,265
+2018-11-29,Weipa,Other / Unidentified,210960
+2019-01-24,Mackay,Dinoflagellates,590
+2019-01-24,Mackay,Other / Unidentified,275990
+2019-01-25,Mackay,Dinoflagellates,260
+2019-01-25,Mackay,Other / Unidentified,242250
+2019-02-27,Weipa,Dinoflagellates,8760
+2019-02-27,Weipa,Other / Unidentified,53790
+2019-03-14,Mackay,Dinoflagellates,112
+2019-03-14,Mackay,Other / Unidentified,39473
+2019-03-15,Mackay,Dinoflagellates,120
+2019-03-15,Mackay,Other / Unidentified,94520
+2019-03-16,Mackay,Dinoflagellates,30
+2019-03-16,Mackay,Other / Unidentified,14120
+2019-03-25,Bowen,Dinoflagellates,390
+2019-03-25,Bowen,Other / Unidentified,78930
+2019-03-26,Bowen,Dinoflagellates,20
+2019-03-26,Bowen,Other / Unidentified,106480
+2019-05-30,Bowen,Dinoflagellates,80
+2019-05-30,Bowen,Other / Unidentified,128460
+2019-05-31,Bowen,Dinoflagellates,30
+2019-05-31,Bowen,Other / Unidentified,14030
+2019-09-23,Mackay,Dinoflagellates,50
+2019-09-23,Mackay,Other / Unidentified,216750
+2019-09-24,Mackay,Dinoflagellates,140
+2019-09-24,Mackay,Other / Unidentified,340510
+2019-10-14,Bowen,Dinoflagellates,90
+2019-10-14,Bowen,Other / Unidentified,161450
+2019-10-17,Weipa,Dinoflagellates,30
+2019-10-17,Weipa,Other / Unidentified,17920
+2019-10-18,Weipa,Other / Unidentified,66430
+2020-02-19,Mackay,Dinoflagellates,280
+2020-02-19,Mackay,Other / Unidentified,254210
+2020-02-20,Mackay,Dinoflagellates,150
+2020-02-20,Mackay,Other / Unidentified,93130
+2020-03-05,Weipa,Dinoflagellates,7480
+2020-03-05,Weipa,Other / Unidentified,23380
+2020-03-06,Weipa,Dinoflagellates,5070
+2020-03-06,Weipa,Other / Unidentified,36070
+2020-04-04,Bowen,Dinoflagellates,190
+2020-04-04,Bowen,Other / Unidentified,164980
+2020-07-11,Mackay,Dinoflagellates,160
+2020-07-11,Mackay,Other / Unidentified,256060
+2020-07-12,Mackay,Dinoflagellates,130
+2020-07-12,Mackay,Other / Unidentified,236320

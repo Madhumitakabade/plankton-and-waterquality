@@ -1,0 +1,131 @@
+sample_date,region,z_group,zoop_total
+2017-09-05,Mackay,Gelatinous zooplankton,250
+2017-09-05,Mackay,Larval stages,96
+2017-09-05,Mackay,Other / Unidentified,1893
+2017-10-20,Mackay,Gelatinous zooplankton,11
+2017-10-20,Mackay,Larval stages,44
+2017-10-20,Mackay,Other / Unidentified,205
+2017-10-21,Mackay,Gelatinous zooplankton,21
+2017-10-21,Mackay,Larval stages,77
+2017-10-21,Mackay,Other / Unidentified,977
+2017-10-22,Mackay,Gelatinous zooplankton,18
+2017-10-22,Mackay,Larval stages,29
+2017-10-22,Mackay,Other / Unidentified,452
+2017-11-22,Bowen,Gelatinous zooplankton,90
+2017-11-22,Bowen,Larval stages,22
+2017-11-22,Bowen,Other / Unidentified,1057
+2017-12-01,Mackay,Gelatinous zooplankton,18
+2017-12-01,Mackay,Larval stages,24
+2017-12-01,Mackay,Other / Unidentified,333
+2017-12-02,Mackay,Gelatinous zooplankton,22
+2017-12-02,Mackay,Larval stages,32
+2017-12-02,Mackay,Other / Unidentified,917
+2017-12-03,Mackay,Gelatinous zooplankton,7
+2017-12-03,Mackay,Larval stages,7
+2017-12-03,Mackay,Other / Unidentified,161
+2017-12-20,Bowen,Gelatinous zooplankton,60
+2017-12-20,Bowen,Larval stages,21
+2017-12-20,Bowen,Other / Unidentified,585
+2018-01-19,Weipa,Gelatinous zooplankton,2
+2018-01-19,Weipa,Larval stages,9
+2018-01-19,Weipa,Other / Unidentified,36
+2018-01-31,Mackay,Gelatinous zooplankton,1
+2018-01-31,Mackay,Larval stages,12
+2018-01-31,Mackay,Other / Unidentified,61
+2018-02-01,Mackay,Gelatinous zooplankton,37
+2018-02-01,Mackay,Larval stages,3
+2018-02-01,Mackay,Other / Unidentified,362
+2018-02-19,Bowen,Gelatinous zooplankton,12
+2018-02-19,Bowen,Larval stages,5
+2018-02-19,Bowen,Other / Unidentified,143
+2018-02-20,Bowen,Larval stages,2
+2018-02-20,Bowen,Other / Unidentified,28
+2018-03-15,Weipa,Gelatinous zooplankton,9
+2018-03-15,Weipa,Larval stages,40
+2018-03-15,Weipa,Other / Unidentified,213
+2018-03-16,Weipa,Gelatinous zooplankton,1
+2018-03-16,Weipa,Larval stages,17
+2018-03-16,Weipa,Other / Unidentified,217
+2018-08-17,Bowen,Gelatinous zooplankton,83
+2018-08-17,Bowen,Larval stages,22
+2018-08-17,Bowen,Other / Unidentified,575
+2018-08-18,Bowen,Gelatinous zooplankton,1
+2018-08-18,Bowen,Larval stages,1
+2018-08-18,Bowen,Other / Unidentified,40
+2018-08-29,Mackay,Larval stages,36
+2018-08-29,Mackay,Other / Unidentified,32
+2018-08-30,Mackay,Gelatinous zooplankton,14
+2018-08-30,Mackay,Larval stages,64
+2018-08-30,Mackay,Other / Unidentified,496
+2018-08-31,Mackay,Larval stages,9
+2018-08-31,Mackay,Other / Unidentified,81
+2018-11-17,Bowen,Gelatinous zooplankton,35
+2018-11-17,Bowen,Larval stages,16
+2018-11-17,Bowen,Other / Unidentified,254
+2018-11-18,Bowen,Other / Unidentified,17
+2018-11-29,Weipa,Gelatinous zooplankton,32
+2018-11-29,Weipa,Larval stages,8
+2018-11-29,Weipa,Other / Unidentified,355
+2019-01-24,Mackay,Gelatinous zooplankton,14
+2019-01-24,Mackay,Larval stages,11
+2019-01-24,Mackay,Other / Unidentified,240
+2019-01-25,Mackay,Gelatinous zooplankton,7
+2019-01-25,Mackay,Larval stages,19
+2019-01-25,Mackay,Other / Unidentified,238
+2019-02-27,Weipa,Gelatinous zooplankton,3
+2019-02-27,Weipa,Larval stages,9
+2019-02-27,Weipa,Other / Unidentified,77
+2019-03-14,Mackay,Gelatinous zooplankton,25
+2019-03-14,Mackay,Larval stages,10
+2019-03-14,Mackay,Other / Unidentified,62
+2019-03-15,Mackay,Gelatinous zooplankton,12
+2019-03-15,Mackay,Larval stages,13
+2019-03-15,Mackay,Other / Unidentified,133
+2019-03-16,Mackay,Other / Unidentified,18
+2019-03-25,Bowen,Gelatinous zooplankton,41
+2019-03-25,Bowen,Larval stages,10
+2019-03-25,Bowen,Other / Unidentified,135
+2019-03-26,Bowen,Gelatinous zooplankton,17
+2019-03-26,Bowen,Other / Unidentified,35
+2019-05-30,Bowen,Gelatinous zooplankton,31
+2019-05-30,Bowen,Larval stages,4
+2019-05-30,Bowen,Other / Unidentified,152
+2019-05-31,Bowen,Gelatinous zooplankton,10
+2019-05-31,Bowen,Larval stages,5
+2019-05-31,Bowen,Other / Unidentified,61
+2019-07-11,Mackay,Gelatinous zooplankton,18
+2019-07-11,Mackay,Larval stages,19
+2019-07-11,Mackay,Other / Unidentified,79
+2019-07-12,Mackay,Gelatinous zooplankton,7
+2019-07-12,Mackay,Larval stages,50
+2019-07-12,Mackay,Other / Unidentified,50
+2019-09-23,Mackay,Gelatinous zooplankton,5
+2019-09-23,Mackay,Larval stages,32
+2019-09-23,Mackay,Other / Unidentified,75
+2019-09-24,Mackay,Crustacean macrozooplankton,2
+2019-09-24,Mackay,Gelatinous zooplankton,15
+2019-09-24,Mackay,Larval stages,27
+2019-09-24,Mackay,Other / Unidentified,252
+2019-10-14,Bowen,Gelatinous zooplankton,41
+2019-10-14,Bowen,Larval stages,11
+2019-10-14,Bowen,Other / Unidentified,221
+2019-10-17,Weipa,Gelatinous zooplankton,2
+2019-10-17,Weipa,Larval stages,17
+2019-10-17,Weipa,Other / Unidentified,320
+2019-10-18,Weipa,Gelatinous zooplankton,21
+2019-10-18,Weipa,Larval stages,6
+2019-10-18,Weipa,Other / Unidentified,96
+2020-02-19,Mackay,Gelatinous zooplankton,7
+2020-02-19,Mackay,Larval stages,33
+2020-02-19,Mackay,Other / Unidentified,210
+2020-02-20,Mackay,Gelatinous zooplankton,2
+2020-02-20,Mackay,Larval stages,5
+2020-02-20,Mackay,Other / Unidentified,77
+2020-03-05,Weipa,Gelatinous zooplankton,9
+2020-03-05,Weipa,Larval stages,8
+2020-03-05,Weipa,Other / Unidentified,37
+2020-03-06,Weipa,Larval stages,19
+2020-03-06,Weipa,Other / Unidentified,10
+2020-04-04,Bowen,Gelatinous zooplankton,43
+2020-04-04,Bowen,Larval stages,23
+2020-04-04,Bowen,Other / Unidentified,95
