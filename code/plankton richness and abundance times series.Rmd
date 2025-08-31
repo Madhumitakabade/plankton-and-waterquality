@@ -13,3 +13,469 @@ Description: This project explores temporal patterns in zooplankton and phytopla
   temperature, and salinity.
 ---
 
+####loading packages
+
+```{r}
+library(readxl)    # to read Excel files
+library(dplyr)     # for data wrangling
+library(janitor)   # for cleaning column names
+library(lubridate) # for handling dates
+```
+
+####loading data files
+
+```{r}
+# Define file paths (relative to project root)
+zoop_file  <- "../data/NQBP zooplankton 2021-02-15.xlsx"
+phyto_file <- "../data/NQBP phytoplankton 2021-02-18.xlsx"
+
+# Import sheets
+zoop_raw <- read_excel(zoop_file, sheet = "in") |> clean_names()
+phyto_raw <- read_excel(phyto_file, sheet = "in") |> clean_names()
+
+# Quick peek
+head(zoop_raw)
+head(phyto_raw)
+```
+
+####setting the scene,prepping for the data frame
+
+```{r}
+# Ensure Date type
+zoop <- zoop_raw |> dplyr::mutate(sample_date = as.Date(sample_date))
+phyto <- phyto_raw |> dplyr::mutate(sample_date = as.Date(sample_date))
+
+# Add region if missing (edit mapping if yours differ)
+add_region <- function(df){
+  has_region <- "region" %in% names(df)
+  if (has_region) return(df)
+  df |>
+    dplyr::mutate(
+      site_code = dplyr::coalesce(site_code, site_name),
+      region_code = stringr::str_extract(site_code, "^[A-Za-z]{3}"),
+      region = dplyr::case_when(
+        region_code %in% c("MKY") ~ "Mackay",
+        region_code %in% c("BWN") ~ "Bowen",
+        region_code %in% c("WEI","WEP") ~ "Weipa",
+        TRUE ~ "Unknown"
+      )
+    ) |>
+    dplyr::select(-region_code)
+}
+zoop <- add_region(zoop)
+phyto <- add_region(phyto)
+```
+
+####quick checks
+
+```{r}
+# Check types
+str(zoop$sample_date); str(phyto$sample_date)
+
+# Peek at the mapping results
+# Zooplankton: include site_name
+dplyr::count(zoop, site_code, site_name, region, sort = TRUE)
+
+# Phytoplankton: include site_name
+dplyr::count(phyto, site_code, site_name, region, sort = TRUE)
+
+# See if anything fell into "Unknown"
+dplyr::count(zoop, region)
+dplyr::count(phyto, region)
+
+# Earliest/latest sampling dates (helps set plot x-limits)
+range(zoop$sample_date, na.rm = TRUE)
+range(phyto$sample_date, na.rm = TRUE)
+
+# Any missing dates?
+sum(is.na(zoop$sample_date))
+sum(is.na(phyto$sample_date))
+
+```
+
+####loading packages for analysis
+
+```{r}
+# Data wrangling + plotting
+library(dplyr)
+library(ggplot2)
+library(readr)   # for write_csv()
+
+```
+
+####building summary tables fpr zooplankton and phytoplankton - abundance and richness
+
+```{r}
+# Abundance: sum of counts (orgs) per date/site/region
+zoop_abund_daily <- zoop |>
+  dplyr::group_by(sample_date, site_code, region) |>
+  dplyr::summarise(
+    zoop_total = sum(as.numeric(orgs), na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Richness: number of distinct taxa per date/site/region
+zoop_rich_daily <- zoop |>
+  dplyr::filter(!is.na(taxa) & taxa != "") |>
+  dplyr::group_by(sample_date, site_code, region) |>
+  dplyr::summarise(
+    zoop_richness = dplyr::n_distinct(taxa),
+    .groups = "drop"
+  )
+
+# Join abundance + richness; order for tidy viewing
+zoop_daily <- dplyr::full_join(
+  zoop_abund_daily, zoop_rich_daily,
+  by = c("sample_date","site_code","region")
+) |>
+  dplyr::arrange(site_code, sample_date)    
+
+# ---- PHYTOPLANKTON ----
+
+# Abundance: sum of cell_count per date/site/region
+phyto_abund_daily <- phyto |>
+  dplyr::group_by(sample_date, site_code, region) |>
+  dplyr::summarise(
+    phyto_total = sum(as.numeric(cell_count), na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Richness: number of distinct taxa per date/site/region
+phyto_rich_daily <- phyto |>
+  dplyr::filter(!is.na(taxa) & taxa != "") |>
+  dplyr::group_by(sample_date, site_code, region) |>
+  dplyr::summarise(
+    phyto_richness = dplyr::n_distinct(taxa),
+    .groups = "drop"
+  )
+
+# Join abundance + richness; order for tidy viewing
+phyto_daily <- dplyr::full_join(
+  phyto_abund_daily, phyto_rich_daily,
+  by = c("sample_date","site_code","region")
+) |>
+  dplyr::arrange(site_code, sample_date)
+
+#saving the output summary tables
+readr::write_csv(zoop_daily,  "output/zooplankton_daily_abund_rich.csv")
+readr::write_csv(phyto_daily, "output/phytoplankton_daily_abund_rich.csv")
+
+
+```
+
+####debugging why output file isnt saving
+
+```{r}
+# Make sure the main output folder exists
+if(!dir.exists("../output")) dir.create("../output")
+
+# Move files from code/output → output
+file.rename("output/zooplankton_daily_abund_rich.csv", 
+            "../output/zooplankton_daily_abund_rich.csv")
+
+file.rename("output/phytoplankton_daily_abund_rich.csv", 
+            "../output/phytoplankton_daily_abund_rich.csv")
+```
+
+####checking if any data rows were lost when summary tables were formed
+
+```{r}
+# Original row counts
+nrow(zoop_raw)
+nrow(phyto_raw)
+
+# Summarised row counts (unique date × site × region combos)
+nrow(zoop_daily)
+nrow(phyto_daily)
+
+# How many unique sampling events were in the raw data?
+n_distinct(zoop_raw$sample_date)
+n_distinct(phyto_raw$sample_date)
+
+# Total abundance in raw vs. summarised
+sum(as.numeric(zoop_raw$orgs), na.rm = TRUE)
+sum(zoop_daily$zoop_total, na.rm = TRUE)
+
+sum(as.numeric(phyto_raw$cell_count), na.rm = TRUE)
+sum(phyto_daily$phyto_total, na.rm = TRUE)
+
+# recompute richness from raw for every site/date
+check_rich <- zoop_raw |>
+  group_by(site_code, sample_date) |>
+  summarise(raw_rich = n_distinct(taxa), .groups = "drop")
+
+# join with your summary table
+compare <- left_join(check_rich, zoop_daily,
+                     by = c("site_code","sample_date"))
+
+# any site/date where richness differs?
+compare |> filter(raw_rich != zoop_richness)
+
+# site-date combos present in raw but missing in summary
+anti_join(check_rich, zoop_daily, by = c("site_code","sample_date"))
+
+## 2) Recompute richness from raw for every site × date
+phyto_check_rich <- phyto_raw |>
+  group_by(site_code, sample_date) |>
+  summarise(raw_rich = n_distinct(taxa), .groups = "drop")
+
+## 3) Compare raw-recomputed richness to your summarised table
+phyto_compare <- left_join(
+  phyto_check_rich,
+  phyto_daily,                     # has phyto_richness
+  by = c("site_code", "sample_date")
+)
+
+# Any mismatches?
+phyto_compare |> filter(raw_rich != phyto_richness)
+# Expect: 0 rows
+
+## 4) Coverage: any site × date in raw missing from summary?
+anti_join(phyto_check_rich, phyto_daily, by = c("site_code","sample_date"))
+# Expect: 0 rows
+
+```
+
+####sorting both the tables from highest count to lowest count
+
+```{r}
+library(dplyr)
+
+# ---- Phytoplankton sorted ----
+# By abundance (highest first)
+phyto_daily_abund_sorted <- phyto_daily %>%
+  arrange(desc(phyto_total))
+
+# By richness (highest first)
+phyto_daily_rich_sorted <- phyto_daily %>%
+  arrange(desc(phyto_richness))
+
+# ---- Zooplankton sorted ----
+# By abundance (highest first)
+zoop_daily_abund_sorted <- zoop_daily %>%
+  arrange(desc(zoop_total))
+
+# By richness (highest first)
+zoop_daily_rich_sorted <- zoop_daily %>%
+  arrange(desc(zoop_richness))
+
+# Peek at top 10 rows of each
+head(phyto_daily_abund_sorted, 10)
+head(phyto_daily_rich_sorted, 10)
+head(zoop_daily_abund_sorted, 10)
+head(zoop_daily_rich_sorted, 10)
+
+# ---- Update phyto_daily ----
+phyto_daily <- phyto_daily %>%
+  arrange(desc(phyto_total), desc(phyto_richness))
+
+# ---- Update zoop_daily ----
+zoop_daily <- zoop_daily %>%
+  arrange(desc(zoop_total), desc(zoop_richness))
+
+```
+
+####making region level tables, for region based analysis
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)   # for floor_date / ceiling_date
+
+# ---------- REGION-DAILY TABLES (as you had) ----------
+# ZOOP
+zoop_region_abund <- zoop %>%
+  group_by(sample_date, region) %>%
+  summarise(zoop_total = sum(as.numeric(orgs), na.rm = TRUE), .groups = "drop")
+
+zoop_region_rich <- zoop %>%
+  filter(!is.na(taxa) & taxa != "") %>%
+  group_by(sample_date, region) %>%
+  summarise(zoop_richness = n_distinct(taxa), .groups = "drop")
+
+zoop_region_daily <- full_join(
+  zoop_region_abund, zoop_region_rich,
+  by = c("sample_date","region")
+) %>% arrange(region, sample_date)
+
+# PHYTO
+phyto_region_abund <- phyto %>%
+  group_by(sample_date, region) %>%
+  summarise(phyto_total = sum(as.numeric(cell_count), na.rm = TRUE), .groups = "drop")
+
+phyto_region_rich <- phyto %>%
+  filter(!is.na(taxa) & taxa != "") %>%
+  group_by(sample_date, region) %>%
+  summarise(phyto_richness = n_distinct(taxa), .groups = "drop")
+
+phyto_region_daily <- full_join(
+  phyto_region_abund, phyto_region_rich,
+  by = c("sample_date","region")
+) %>% arrange(region, sample_date)
+
+# ---------- CONSISTENT X-AXIS (3-month ticks, same limits for all plots) ----------
+x_min <- min(c(zoop_region_daily$sample_date,  phyto_region_daily$sample_date), na.rm = TRUE)
+x_max <- max(c(zoop_region_daily$sample_date,  phyto_region_daily$sample_date), na.rm = TRUE)
+
+# snap limits nicely to quarter starts/ends
+x_lim_min <- floor_date(x_min, "quarter")
+x_lim_max <- ceiling_date(x_max, "quarter")
+
+x_scale <- scale_x_date(
+  limits      = c(x_lim_min, x_lim_max),
+  breaks      = seq(x_lim_min, x_lim_max, by = "3 months"),  # Jan/Apr/Jul/Oct pattern
+  date_labels = "%Y-%m",
+  expand      = c(0.01, 0.01)
+)
+
+common_theme <- theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# ---------- PLOTS ----------
+# 1) Zooplankton abundance (by region)
+p1 <- ggplot(zoop_region_daily, aes(sample_date, zoop_total, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Zooplankton abundance over time (by region)",
+       x = "Date", y = "Total zooplankton") +
+  x_scale + common_theme
+
+# 2) Zooplankton richness (by region)
+p2 <- ggplot(zoop_region_daily, aes(sample_date, zoop_richness, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Zooplankton richness over time (by region)",
+       x = "Date", y = "Number of taxa") +
+  x_scale + common_theme
+
+# 3) Phytoplankton abundance (by region)
+p3 <- ggplot(phyto_region_daily, aes(sample_date, phyto_total, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Phytoplankton abundance over time (by region)",
+       x = "Date", y = "Total phytoplankton (cells)") +
+  x_scale + common_theme
+
+# 4) Phytoplankton richness (by region)
+p4 <- ggplot(phyto_region_daily, aes(sample_date, phyto_richness, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Phytoplankton richness over time (by region)",
+       x = "Date", y = "Number of taxa") +
+  x_scale + common_theme
+
+# print
+p1; p2; p3; p4
+
+
+```
+
+####code for zooplankton sampling effort
+
+```{r}
+# Zooplankton sampling effort (count per region per date)
+zoop_sampling <- zoop %>%
+  dplyr::count(sample_date, region, name = "n_samples")
+
+# ---- Zooplankton sampling effort ----
+ggplot(zoop_sampling, aes(x = sample_date, y = n_samples, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Zooplankton sampling effort (by region)",
+       x = "Date", y = "Number of samples") +
+  scale_x_date(
+    date_breaks = "3 months",   # every 3 months
+    date_labels = "%Y-%m"       # format like 2018-01, 2018-04, etc
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+####code for phytoplankton sampling effort
+
+```{r}
+# Phytoplankton sampling effort (count per region per date)
+phyto_sampling <- phyto %>%
+  dplyr::count(sample_date, region, name = "n_samples")
+
+ggplot(phyto_sampling, aes(x = sample_date, y = n_samples, color = region)) +
+  geom_line() + geom_point(size = 0.8) +
+  labs(title = "Phytoplankton sampling effort (by region)",
+       x = "Date", y = "Number of samples") +
+  scale_x_date(
+    date_breaks = "3 months",   
+    date_labels = "%Y-%m"       
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+####site wise time series comparisons
+
+```{r}
+install.packages(c("ggforce","scales"))  # if needed
+library(dplyr)
+library(ggplot2)
+library(ggforce)
+library(scales)
+library(grid)   # for unit()
+
+plot_sites_ts <- function(df, region_name, ycol, ylab,
+                          page = 1, nrow = 3, ncol = 3) {
+  df %>%
+    filter(region == region_name) %>%
+    group_by(site_code) %>%
+    mutate(.order = median(.data[[ycol]], na.rm = TRUE)) %>%
+    ungroup() %>%
+    ggplot(aes(x = sample_date, y = .data[[ycol]])) +
+    geom_line(linewidth = 0.5, color = "#2E2E2E") +
+    geom_point(size = 1.1, alpha = 0.85, color = "#2E2E2E") +
+    scale_x_date(
+      date_breaks = "3 months",     # <- unchanged
+      date_labels = "%Y-%m",
+      expand = expansion(mult = c(0.01, 0.03))
+    ) +
+    scale_y_continuous(labels = label_number(big.mark = ",")) +
+    labs(title = paste(ylab, "by site —", region_name),
+         x = "Date", y = ylab) +
+    facet_wrap_paginate(
+      ~ reorder(site_code, .order),
+      nrow = nrow, ncol = ncol, page = page,
+      scales = "free_y"
+    ) +
+    theme_minimal(base_size = 10) +
+    theme(
+      panel.grid.minor = element_blank(),
+      panel.spacing = unit(10, "pt"),
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 8),
+      axis.text.y = element_text(size = 8),
+      plot.title = element_text(face = "bold", size = 13),
+      plot.margin = margin(6, 10, 6, 10)
+    )
+}
+
+
+# ===================== ZOOPLANKTON =====================
+
+# Abundance by site, per region
+plot_sites(zoop_daily, "Bowen",  "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 1)
+plot_sites(zoop_daily, "Mackay", "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 2)
+plot_sites(zoop_daily, "Weipa",  "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 1)
+
+# Richness by site, per region
+plot_sites(zoop_daily, "Bowen",  "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 1)
+plot_sites(zoop_daily, "Mackay", "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 2)
+plot_sites(zoop_daily, "Weipa",  "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 1)
+
+# ===================== PHYTOPLANKTON =====================
+
+# Abundance by site, per region
+plot_sites(phyto_daily, "Bowen",  "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 1)
+plot_sites(phyto_daily, "Mackay", "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 2)
+plot_sites(phyto_daily, "Weipa",  "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 1)
+
+# Richness by site, per region
+plot_sites(phyto_daily, "Bowen",  "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 1)
+plot_sites(phyto_daily, "Mackay", "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 2)
+plot_sites(phyto_daily, "Weipa",  "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 1)
+
+```
+
