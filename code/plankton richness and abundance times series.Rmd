@@ -406,49 +406,33 @@ ggplot(phyto_sampling, aes(x = sample_date, y = n_samples, color = region)) +
 
 ```
 
-
 ####site wise time series comparisons
 
 ```{r}
-install.packages(c("ggforce","scales"))  # if needed
+# install once if needed:
+# install.packages("ggforce")
+
 library(dplyr)
 library(ggplot2)
 library(ggforce)
-library(scales)
-library(grid)   # for unit()
 
-plot_sites_ts <- function(df, region_name, ycol, ylab,
-                          page = 1, nrow = 3, ncol = 3) {
+plot_sites <- function(df, region_pick, yvar, ylab, title,
+                       ncol = 4, nrow = 3, page = 1) {
+
   df %>%
-    filter(region == region_name) %>%
-    group_by(site_code) %>%
-    mutate(.order = median(.data[[ycol]], na.rm = TRUE)) %>%
-    ungroup() %>%
-    ggplot(aes(x = sample_date, y = .data[[ycol]])) +
-    geom_line(linewidth = 0.5, color = "#2E2E2E") +
-    geom_point(size = 1.1, alpha = 0.85, color = "#2E2E2E") +
-    scale_x_date(
-      date_breaks = "3 months",     # <- unchanged
-      date_labels = "%Y-%m",
-      expand = expansion(mult = c(0.01, 0.03))
-    ) +
-    scale_y_continuous(labels = label_number(big.mark = ",")) +
-    labs(title = paste(ylab, "by site —", region_name),
+    filter(region == region_pick) %>%
+    ggplot(aes(x = sample_date, y = .data[[yvar]])) +
+    geom_line(linewidth = 0.4, alpha = 0.8) +
+    geom_point(size = 1.2, alpha = 0.9) +
+    facet_wrap_paginate(~ site_code, ncol = ncol, nrow = nrow, page = page) +
+    scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") +
+    labs(title = paste0(title, " — ", region_pick),
          x = "Date", y = ylab) +
-    facet_wrap_paginate(
-      ~ reorder(site_code, .order),
-      nrow = nrow, ncol = ncol, page = page,
-      scales = "free_y"
-    ) +
-    theme_minimal(base_size = 10) +
+    theme_minimal(base_size = 11) +
     theme(
       panel.grid.minor = element_blank(),
-      panel.spacing = unit(10, "pt"),
-      strip.text = element_text(face = "bold", size = 10),
-      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 8),
-      axis.text.y = element_text(size = 8),
-      plot.title = element_text(face = "bold", size = 13),
-      plot.margin = margin(6, 10, 6, 10)
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+      strip.text = element_text(face = "bold")
     )
 }
 
@@ -457,25 +441,268 @@ plot_sites_ts <- function(df, region_name, ycol, ylab,
 
 # Abundance by site, per region
 plot_sites(zoop_daily, "Bowen",  "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 1)
-plot_sites(zoop_daily, "Mackay", "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 2)
+plot_sites(zoop_daily, "Mackay", "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 1)
 plot_sites(zoop_daily, "Weipa",  "zoop_total",     "Total zooplankton",            "Zooplankton abundance by site", page = 1)
 
 # Richness by site, per region
 plot_sites(zoop_daily, "Bowen",  "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 1)
-plot_sites(zoop_daily, "Mackay", "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 2)
+plot_sites(zoop_daily, "Mackay", "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 1)
 plot_sites(zoop_daily, "Weipa",  "zoop_richness",  "Zooplankton taxa richness",    "Zooplankton richness by site", page = 1)
 
 # ===================== PHYTOPLANKTON =====================
 
 # Abundance by site, per region
 plot_sites(phyto_daily, "Bowen",  "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 1)
-plot_sites(phyto_daily, "Mackay", "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 2)
+plot_sites(phyto_daily, "Mackay", "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 1)
 plot_sites(phyto_daily, "Weipa",  "phyto_total",    "Total phytoplankton (cells)",  "Phytoplankton abundance by site", page = 1)
 
 # Richness by site, per region
 plot_sites(phyto_daily, "Bowen",  "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 1)
-plot_sites(phyto_daily, "Mackay", "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 2)
+plot_sites(phyto_daily, "Mackay", "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 1)
 plot_sites(phyto_daily, "Weipa",  "phyto_richness", "Phytoplankton taxa richness",  "Phytoplankton richness by site", page = 1)
+
+```
+
+#lets move on to making chategories of zooplankton and phytoplankton species
+
+####defining functional groups and mapping them in the table
+
+```{r}
+## Desired display order
+zoop_levels  <- c("Copepods",
+                  "Cladocerans & Rotifers",
+                  "Crustacean macrozooplankton",
+                  "Gelatinous zooplankton",
+                  "Larval stages",
+                  "Other / Unidentified")
+
+phyto_levels <- c("Cyanobacteria",
+                  "Diatoms",
+                  "Dinoflagellates",
+                  "Green algae",
+                  "Other flagellates / minor groups",
+                  "Other / Unidentified")
+
+## Map zooplankton taxa -> functional group
+map_zoop_group <- function(x) {
+  x <- str_to_lower(str_squish(x %||% ""))
+
+  case_when(
+    # Copepods
+    str_detect(x, "calanoid|cyclopoid|harpacticoid|copepod") ~ "Copepods",
+
+    # Cladocerans & Rotifers
+    str_detect(x, "cladocer|daphnia|bosmina|rotifer") ~ "Cladocerans & Rotifers",
+
+    # Crustacean macrozooplankton (non-copepod)
+    str_detect(x, "amphipod|isopod|mysid|ostracod") ~ "Crustacean macrozooplankton",
+
+    # Gelatinous (predatory) zooplankton
+    str_detect(x, "chaetognath|sagitta|cnidaria|medus") ~ "Gelatinous zooplankton",
+
+    # Larval stages (polychaete, mollusc, decapod, fish, other larvae)
+    str_detect(x, "larv|veliger|polychaet|decapod|zoeae?|megalop|fish egg|ichthyo") ~ "Larval stages",
+
+    TRUE ~ "Other / Unidentified"
+  )
+}
+
+## Map phytoplankton taxa -> functional group
+map_phyto_group <- function(x) {
+  x <- str_to_lower(str_squish(x %||% ""))
+
+  case_when(
+    # Cyanobacteria
+    str_detect(x, "cyanobacter|anabaena|microcystis|oscillat") ~ "Cyanobacteria",
+
+    # Diatoms
+    str_detect(x, "diatom|bacillario") ~ "Diatoms",
+
+    # Dinoflagellates
+    str_detect(x, "dinoflagell|\\bdino\\b|peridinium|ceratium|alexandri") ~ "Dinoflagellates",
+
+    # Green algae
+    str_detect(x, "chlorophy|scenedesmus|chlorella") ~ "Green algae",
+
+    # Other flagellates / minor groups
+    str_detect(x, "euglen|cryptophy|chrysophy|silicoflagell|haptophy|prymnes|xanthophy|flagellate") ~
+      "Other flagellates / minor groups",
+
+    TRUE ~ "Other / Unidentified"
+  )
+}
+
+```
+
+####attaching?replacing group labels to rows
+
+```{r}
+library(stringr)
+
+# ZOOP
+zoop_cat <- zoop %>%
+  mutate(
+    taxa_clean = str_to_lower(str_squish(as.character(taxa))),
+    z_group    = factor(map_zoop_group(taxa_clean), levels = zoop_levels)
+  )
+
+# PHYTO
+phyto_cat <- phyto %>%
+  mutate(
+    taxa_clean = str_to_lower(str_squish(as.character(taxa))),
+    p_group    = factor(map_phyto_group(taxa_clean), levels = phyto_levels)
+  )
+
+```
+
+####Build region-wise time-series tables (abundance & richness)
+
+```{r}
+## ----- ZOOPLANKTON -----
+
+# Abundance by date × region × group
+zoop_reg_grp_abund <- zoop_cat %>%
+  group_by(sample_date, region, z_group) %>%
+  summarise(zoop_total = sum(as.numeric(orgs), na.rm = TRUE), .groups = "drop")
+
+# Richness by date × region × group (distinct taxa within the group)
+zoop_reg_grp_rich <- zoop_cat %>%
+  filter(!is.na(taxa_clean) & taxa_clean != "") %>%
+  group_by(sample_date, region, z_group) %>%
+  summarise(zoop_richness = n_distinct(taxa_clean), .groups = "drop")
+
+
+## ----- PHYTOPLANKTON -----
+
+# Abundance by date × region × group
+phyto_reg_grp_abund <- phyto_cat %>%
+  group_by(sample_date, region, p_group) %>%
+  summarise(phyto_total = sum(as.numeric(cell_count), na.rm = TRUE), .groups = "drop")
+
+# Richness by date × region × group
+phyto_reg_grp_rich <- phyto_cat %>%
+  filter(!is.na(taxa_clean) & taxa_clean != "") %>%
+  group_by(sample_date, region, p_group) %>%
+  summarise(phyto_richness = n_distinct(taxa_clean), .groups = "drop")
+
+```
+
+####Save the tidy tables
+
+```{r}
+
+library(here)
+
+# project-level output/
+out_dir <- here("output")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+readr::write_csv(zoop_reg_grp_abund, "../output/zoop_region_group_abundance.csv")
+readr::write_csv(zoop_reg_grp_rich,  "../output/zoop_region_group_richness.csv")
+readr::write_csv(phyto_reg_grp_abund,"../output/phyto_region_group_abundance.csv")
+readr::write_csv(phyto_reg_grp_rich, "../output/phyto_region_group_richness.csv")
+
+```
+
+####quick checks to see if the files are correct
+
+```{r}
+# Recompute directly from raw
+check_zoop_rich <- zoop %>%
+  filter(!is.na(taxa) & taxa != "") %>%
+  group_by(sample_date, region) %>%
+  summarise(raw_rich = n_distinct(taxa), .groups = "drop")
+
+# Compare with summary table
+compare_rich <- left_join(
+  check_zoop_rich,
+  zoop_reg_grp_rich,
+  by = c("sample_date","region")
+)
+
+# Any mismatches?
+compare_rich %>% filter(raw_rich != zoop_richness)
+
+
+```
+
+#looking for missing combos
+
+```{r}
+# Zooplankton check
+zoop_missing <- dplyr::anti_join(
+  zoop %>% distinct(sample_date, site_code, region),
+  zoop_reg_grp_abund %>% distinct(sample_date, region),
+  by = c("sample_date","region")
+)
+
+# Phytoplankton check
+phyto_missing <- dplyr::anti_join(
+  phyto %>% distinct(sample_date, site_code, region),
+  phyto_reg_grp_abund %>% distinct(sample_date, region),
+  by = c("sample_date","region")
+)
+
+zoop_missing
+phyto_missing
+
+```
+
+####sanity checks for totals
+
+```{r}
+sum(as.numeric(zoop$orgs), na.rm = TRUE)
+sum(zoop_reg_grp_abund$zoop_total, na.rm = TRUE)
+
+sum(as.numeric(phyto$cell_count), na.rm = TRUE)
+sum(phyto_reg_grp_abund$phyto_total, na.rm = TRUE)
+
+```
+
+#####checking the unidentified taxa
+
+```{r}
+library(dplyr)
+
+# 0) Make sure the categorized tables exist
+# (re-run your creation step if needed)
+# zoop_cat has columns: taxa_clean, z_group
+# phyto_cat has columns: taxa_clean, p_group
+
+# 1) Check what labels actually exist
+zoop_cat %>% distinct(z_group) %>% arrange(z_group)
+phyto_cat %>% distinct(p_group) %>% arrange(p_group)
+
+# 2) Robust filter that tolerates spacing/case
+zoop_other <- zoop_cat %>%
+  filter(!is.na(z_group),
+         grepl("^other\\s*/\\s*unidentified$", z_group, ignore.case = TRUE)) %>%
+  count(taxa_clean, sort = TRUE)
+
+phyto_other <- phyto_cat %>%
+  filter(!is.na(p_group),
+         grepl("^other\\s*/\\s*unidentified$", p_group, ignore.case = TRUE)) %>%
+  count(taxa_clean, sort = TRUE)
+
+# 3) If you prefer exact string (after you confirm the label)
+# replace the grepl(...) with:
+# filter(z_group == "Other / Unidentified")
+
+# 4) (Optional) also see where they occur
+zoop_other_by_region <- zoop_cat %>%
+  filter(grepl("^other\\s*/\\s*unidentified$", z_group, ignore.case = TRUE)) %>%
+  count(region, taxa_clean, sort = TRUE)
+
+phyto_other_by_region <- phyto_cat %>%
+  filter(grepl("^other\\s*/\\s*unidentified$", p_group, ignore.case = TRUE)) %>%
+  count(region, taxa_clean, sort = TRUE)
+
+# 5) Write out (use here::here if you like)
+if (!dir.exists("output")) dir.create("output", recursive = TRUE)
+readr::write_csv(zoop_other,            "../output/zoop_unidentified_taxa.csv")
+readr::write_csv(zoop_other_by_region,  "../output/zoop_unidentified_by_region.csv")
+readr::write_csv(phyto_other,           "../output/phyto_unidentified_taxa.csv")
+readr::write_csv(phyto_other_by_region, "../output/phyto_unidentified_by_region.csv")
 
 ```
 
