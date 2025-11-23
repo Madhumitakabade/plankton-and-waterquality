@@ -26,8 +26,8 @@ library(lubridate) # for handling dates
 
 ```{r}
 # Define file paths (relative to project root)
-zoop_file  <- "../data/NQBP zooplankton 2021-02-15.xlsx"
-phyto_file <- "../data/NQBP phytoplankton 2021-02-18.xlsx"
+zoop_file  <- "data/NQBP zooplankton 2021-02-15.xlsx"
+phyto_file <- "data/NQBP phytoplankton 2021-02-18.xlsx"
 
 # Import sheets
 zoop_raw <- read_excel(zoop_file, sheet = "in") |> clean_names()
@@ -465,244 +465,642 @@ plot_sites(phyto_daily, "Weipa",  "phyto_richness", "Phytoplankton taxa richness
 
 #lets move on to making chategories of zooplankton and phytoplankton species
 
-####defining functional groups and mapping them in the table
-
-```{r}
-## Desired display order
-zoop_levels  <- c("Copepods",
-                  "Cladocerans & Rotifers",
-                  "Crustacean macrozooplankton",
-                  "Gelatinous zooplankton",
-                  "Larval stages",
-                  "Other / Unidentified")
-
-phyto_levels <- c("Cyanobacteria",
-                  "Diatoms",
-                  "Dinoflagellates",
-                  "Green algae",
-                  "Other flagellates / minor groups",
-                  "Other / Unidentified")
-
-## Map zooplankton taxa -> functional group
-map_zoop_group <- function(x) {
-  x <- str_to_lower(str_squish(x %||% ""))
-
-  case_when(
-    # Copepods
-    str_detect(x, "calanoid|cyclopoid|harpacticoid|copepod") ~ "Copepods",
-
-    # Cladocerans & Rotifers
-    str_detect(x, "cladocer|daphnia|bosmina|rotifer") ~ "Cladocerans & Rotifers",
-
-    # Crustacean macrozooplankton (non-copepod)
-    str_detect(x, "amphipod|isopod|mysid|ostracod") ~ "Crustacean macrozooplankton",
-
-    # Gelatinous (predatory) zooplankton
-    str_detect(x, "chaetognath|sagitta|cnidaria|medus") ~ "Gelatinous zooplankton",
-
-    # Larval stages (polychaete, mollusc, decapod, fish, other larvae)
-    str_detect(x, "larv|veliger|polychaet|decapod|zoeae?|megalop|fish egg|ichthyo") ~ "Larval stages",
-
-    TRUE ~ "Other / Unidentified"
-  )
-}
-
-## Map phytoplankton taxa -> functional group
-map_phyto_group <- function(x) {
-  x <- str_to_lower(str_squish(x %||% ""))
-
-  case_when(
-    # Cyanobacteria
-    str_detect(x, "cyanobacter|anabaena|microcystis|oscillat") ~ "Cyanobacteria",
-
-    # Diatoms
-    str_detect(x, "diatom|bacillario") ~ "Diatoms",
-
-    # Dinoflagellates
-    str_detect(x, "dinoflagell|\\bdino\\b|peridinium|ceratium|alexandri") ~ "Dinoflagellates",
-
-    # Green algae
-    str_detect(x, "chlorophy|scenedesmus|chlorella") ~ "Green algae",
-
-    # Other flagellates / minor groups
-    str_detect(x, "euglen|cryptophy|chrysophy|silicoflagell|haptophy|prymnes|xanthophy|flagellate") ~
-      "Other flagellates / minor groups",
-
-    TRUE ~ "Other / Unidentified"
-  )
-}
-
-```
-
-####attaching?replacing group labels to rows
-
-```{r}
-library(stringr)
-
-# ZOOP
-zoop_cat <- zoop %>%
-  mutate(
-    taxa_clean = str_to_lower(str_squish(as.character(taxa))),
-    z_group    = factor(map_zoop_group(taxa_clean), levels = zoop_levels)
-  )
-
-# PHYTO
-phyto_cat <- phyto %>%
-  mutate(
-    taxa_clean = str_to_lower(str_squish(as.character(taxa))),
-    p_group    = factor(map_phyto_group(taxa_clean), levels = phyto_levels)
-  )
-
-```
-
-####Build region-wise time-series tables (abundance & richness)
-
-```{r}
-## ----- ZOOPLANKTON -----
-
-# Abundance by date × region × group
-zoop_reg_grp_abund <- zoop_cat %>%
-  group_by(sample_date, region, z_group) %>%
-  summarise(zoop_total = sum(as.numeric(orgs), na.rm = TRUE), .groups = "drop")
-
-# Richness by date × region × group (distinct taxa within the group)
-zoop_reg_grp_rich <- zoop_cat %>%
-  filter(!is.na(taxa_clean) & taxa_clean != "") %>%
-  group_by(sample_date, region, z_group) %>%
-  summarise(zoop_richness = n_distinct(taxa_clean), .groups = "drop")
-
-
-## ----- PHYTOPLANKTON -----
-
-# Abundance by date × region × group
-phyto_reg_grp_abund <- phyto_cat %>%
-  group_by(sample_date, region, p_group) %>%
-  summarise(phyto_total = sum(as.numeric(cell_count), na.rm = TRUE), .groups = "drop")
-
-# Richness by date × region × group
-phyto_reg_grp_rich <- phyto_cat %>%
-  filter(!is.na(taxa_clean) & taxa_clean != "") %>%
-  group_by(sample_date, region, p_group) %>%
-  summarise(phyto_richness = n_distinct(taxa_clean), .groups = "drop")
-
-```
-
-####Save the tidy tables
-
-```{r}
-
-library(here)
-
-# project-level output/
-out_dir <- here("output")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-readr::write_csv(zoop_reg_grp_abund, "../output/zoop_region_group_abundance.csv")
-readr::write_csv(zoop_reg_grp_rich,  "../output/zoop_region_group_richness.csv")
-readr::write_csv(phyto_reg_grp_abund,"../output/phyto_region_group_abundance.csv")
-readr::write_csv(phyto_reg_grp_rich, "../output/phyto_region_group_richness.csv")
-
-```
-
-####quick checks to see if the files are correct
-
-```{r}
-# Recompute directly from raw
-check_zoop_rich <- zoop %>%
-  filter(!is.na(taxa) & taxa != "") %>%
-  group_by(sample_date, region) %>%
-  summarise(raw_rich = n_distinct(taxa), .groups = "drop")
-
-# Compare with summary table
-compare_rich <- left_join(
-  check_zoop_rich,
-  zoop_reg_grp_rich,
-  by = c("sample_date","region")
-)
-
-# Any mismatches?
-compare_rich %>% filter(raw_rich != zoop_richness)
-
-
-```
-
-#looking for missing combos
-
-```{r}
-# Zooplankton check
-zoop_missing <- dplyr::anti_join(
-  zoop %>% distinct(sample_date, site_code, region),
-  zoop_reg_grp_abund %>% distinct(sample_date, region),
-  by = c("sample_date","region")
-)
-
-# Phytoplankton check
-phyto_missing <- dplyr::anti_join(
-  phyto %>% distinct(sample_date, site_code, region),
-  phyto_reg_grp_abund %>% distinct(sample_date, region),
-  by = c("sample_date","region")
-)
-
-zoop_missing
-phyto_missing
-
-```
-
-####sanity checks for totals
-
-```{r}
-sum(as.numeric(zoop$orgs), na.rm = TRUE)
-sum(zoop_reg_grp_abund$zoop_total, na.rm = TRUE)
-
-sum(as.numeric(phyto$cell_count), na.rm = TRUE)
-sum(phyto_reg_grp_abund$phyto_total, na.rm = TRUE)
-
-```
-
-#####checking the unidentified taxa
+# Listing all the unique taxa in the taxa column for zoop and phyto
 
 ```{r}
 library(dplyr)
 
-# 0) Make sure the categorized tables exist
-# (re-run your creation step if needed)
-# zoop_cat has columns: taxa_clean, z_group
-# phyto_cat has columns: taxa_clean, p_group
+unique_taxa_zoop <- zoop |>
+  distinct(taxa) |>        # keeps only unique taxa names
+  arrange(taxa, .by_group = FALSE) |>        # sorts alphabetical(optional)
+  pull(taxa)                # extracts as a vector
 
-# 1) Check what labels actually exist
-zoop_cat %>% distinct(z_group) %>% arrange(z_group)
-phyto_cat %>% distinct(p_group) %>% arrange(p_group)
+write.csv(unique_taxa_zoop, "data/unique_taxa_list.csv", row.names = FALSE)
 
-# 2) Robust filter that tolerates spacing/case
-zoop_other <- zoop_cat %>%
-  filter(!is.na(z_group),
-         grepl("^other\\s*/\\s*unidentified$", z_group, ignore.case = TRUE)) %>%
-  count(taxa_clean, sort = TRUE)
-
-phyto_other <- phyto_cat %>%
-  filter(!is.na(p_group),
-         grepl("^other\\s*/\\s*unidentified$", p_group, ignore.case = TRUE)) %>%
-  count(taxa_clean, sort = TRUE)
-
-# 3) If you prefer exact string (after you confirm the label)
-# replace the grepl(...) with:
-# filter(z_group == "Other / Unidentified")
-
-# 4) (Optional) also see where they occur
-zoop_other_by_region <- zoop_cat %>%
-  filter(grepl("^other\\s*/\\s*unidentified$", z_group, ignore.case = TRUE)) %>%
-  count(region, taxa_clean, sort = TRUE)
-
-phyto_other_by_region <- phyto_cat %>%
-  filter(grepl("^other\\s*/\\s*unidentified$", p_group, ignore.case = TRUE)) %>%
-  count(region, taxa_clean, sort = TRUE)
-
-# 5) Write out (use here::here if you like)
-if (!dir.exists("output")) dir.create("output", recursive = TRUE)
-readr::write_csv(zoop_other,            "../output/zoop_unidentified_taxa.csv")
-readr::write_csv(zoop_other_by_region,  "../output/zoop_unidentified_by_region.csv")
-readr::write_csv(phyto_other,           "../output/phyto_unidentified_taxa.csv")
-readr::write_csv(phyto_other_by_region, "../output/phyto_unidentified_by_region.csv")
 
 ```
 
+# Adding functional group column to the dataset(first go)
+
+```{r}
+library(dplyr)
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous Zooplankton
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae"
+      ) ~ "Gelatinous Zooplankton",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea", "Cephalapoda"
+      ) ~ "Larval Forms",
+
+      # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # 6. Molluscs & Others
+      taxa %in% c(
+        "Gastropoda", "Oikopleura dioica", "Flaccisagitta enflata"
+      ) ~ "Molluscs & Others",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+#calculating abundance
+
+library(dplyr)
+
+zoop_fg_region <- zoop_fg |>
+  group_by(region, sample_date, functional_group) |>
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
+
+library(ggplot2)
+library(dplyr)
+
+#Plot for Bowen
+ggplot(
+  zoop_fg_region |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Bowen",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Mackay",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Weipa",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+```
+
+# Adding functional group column to the dataset(second go)
+
+```{r}
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others (merged)
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea"
+      ) ~ "Larval Forms",
+
+       # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+#calculating abundance
+
+library(dplyr)
+
+zoop_fg_region <- zoop_fg |>
+  group_by(region, sample_date, functional_group) |>
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
+
+library(ggplot2)
+library(dplyr)
+
+#Plot for Bowen
+ggplot(
+  zoop_fg_region |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Bowen",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Mackay",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Weipa",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+# Adding functional group column to the dataset(third go)
+
+```{r}
+library(dplyr)
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Small / Micro / Larval Forms (merged)
+      taxa %in% c(
+        "Larval fish & eggs",
+        "Polychaete", "Polychaeta", "Polycheate",
+        "Cnidarian larvae", "Echinoidea",
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Small / Micro / Larval Forms",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+library(dplyr)
+
+zoop_fg_region <- zoop_fg |>
+  group_by(region, sample_date, functional_group) |>
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
+
+#Plot for Bowen
+ggplot(
+  zoop_fg_region |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Bowen",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Mackay",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Plot for Mackay
+ggplot(
+  zoop_fg_region |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = total_abundance,
+      colour = functional_group,
+      group = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Zooplankton Functional Group Abundance Over Time — Weipa",
+    x = "Date",
+    y = "Total abundance (Orgs)",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+# phyto functional group analysis
+# Summarise phyto abundance by functional group, region, and date
+
+
+```{r}
+library(dplyr)
+
+phyto_fg_region <- phyto |>
+  group_by(region, sample_date, group) |>
+  summarise(
+    total_cells = sum(cell_count, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Region-wise time-series plots (separate graphs)
+#Bowen
+library(ggplot2)
+
+ggplot(
+  phyto_fg_region |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = total_cells,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton functional group abundance over time — Bowen",
+    x      = "Date",
+    y      = "Total cell count",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Mackay
+
+ggplot(
+  phyto_fg_region |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = total_cells,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton functional group abundance over time — Mackay",
+    x      = "Date",
+    y      = "Total cell count",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Weipa
+
+ggplot(
+  phyto_fg_region |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = total_cells,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton functional group abundance over time — Weipa",
+    x      = "Date",
+    y      = "Total cell count",
+    colour = "Functional group"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+# sitewise functional group timeline graphs (zoop)
+
+```{r}
+#summarising the dataset
+zoop_fg_site <- zoop_fg |>
+  group_by(region, site_code, site_name, sample_date, functional_group) |>
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
+
+#creating function for sitewise timeline functional group graphs
+
+plot_site_fg <- function(site_id) {
+  ggplot(
+    zoop_fg_site |> filter(site_code == site_id),
+    aes(x = sample_date,
+        y = total_abundance,
+        colour = functional_group,
+        group = functional_group)
+  ) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title = paste("Zooplankton Functional Group Abundance —", site_id),
+      x = "Date",
+      y = "Total abundance (Orgs)",
+      colour = "Functional group"
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+#Plotting all the sites
+
+sites <- c(
+  "AP_AMB1", "AP_AMB2", "AP_AMB3", "AP_AMB4", "AP_AMB5",
+  "MKY_AMB1", "MKY_AMB10", "MKY_AMB11", "MKY_AMB12",
+  "MKY_AMB2", "MKY_AMB3B", "MKY_AMB5", "MKY_AMB6B", "MKY_AMB8",
+  "MKY_CAM1", "MKY_CAM2", "MKY_CAM3",
+  "WP_AMB1", "WP_AMB2", "WP_AMB3", "WP_AMB4", "WP_AMB5"
+)
+
+# Run your plot function for every site automatically
+for (s in sites) {
+  print(paste("Plotting site:", s))
+  print(plot_site_fg(s))
+}
+
+
+```
+
+# sitewise functional group timeline graphs (phyto)
+
+```{r}
+# Summarise phytoplankton by site + functional group
+library(dplyr)
+
+phyto_fg_site <- phyto |>
+  group_by(region, site_code, site_name, sample_date, group) |>
+  summarise(
+    total_cells = sum(cell_count, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Function to make site-wise functional group timelines
+
+library(ggplot2)
+
+plot_phyto_site_fg <- function(site_id) {
+  ggplot(
+    phyto_fg_site |> filter(site_code == site_id),
+    aes(x = sample_date,
+        y = total_cells,
+        colour = group,
+        group = group)
+  ) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title = paste("Phytoplankton Functional Group Abundance —", site_id),
+      x = "Date",
+      y = "Total cell count",
+      colour = "Functional group"
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Get all sites & plot them
+
+phyto_sites <- sort(unique(phyto_fg_site$site_code))
+
+for (s in phyto_sites) {
+  print(paste("Plotting site:", s))
+  print(plot_phyto_site_fg(s))
+}
+
+```
+
+# Comparing WaterQuality Data
+# processing physiochem data 
+
+
+```{r}
+# Which sheet to use & how to read both in R
+
+library(readxl)
+library(dplyr)
+
+physio_path <- "data/Physiochem Database tables_all_rows(20240902_1226).xlsx"
+
+field_obs  <- read_excel(physio_path, sheet = "Field_obs(20240902_1226)")
+field_meas <- read_excel(physio_path, sheet = "Field_meas(20240902_1226)")
+
+
+# Combine the sheets & add region
+
+library(dplyr)
+
+# 1. surface-only physio measurements
+meas_surface <- field_meas |>
+  filter(Category == "Surface") |>
+  select(Site_code, Date, Temp, EC_mScm, Salinity)  # adjust names if slightly different
+
+# 2. field observations with Secchi
+obs_light <- field_obs |>
+  select(Site_code, Date, Secchi)  # keep Secchi as your light variable
+
+# 3. join them together by site + date
+physio_join <- meas_surface |>
+  left_join(obs_light, by = c("Site_code", "Date"))
+
+# 4. get region lookup from your plankton data
+site_regions <- zoop |>
+  distinct(site_code, region)
+
+# 5. add region
+physio_join <- physio_join |>
+  left_join(site_regions, by = c("Site_code" = "site_code"))
+
+# Summarise region-wise over time
+physio_region <- physio_join |>
+  group_by(region, Date) |>
+  summarise(
+    temp_c       = mean(Temp,      na.rm = TRUE),
+    salinity_psu = mean(Salinity,  na.rm = TRUE),   # or EC_mScm if that's what you want
+    secchi_m     = mean(Secchi,    na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Make a 3-panel region-wise timeline (light, temp, salinity)
+
+library(tidyr)
+library(ggplot2)
+
+physio_region_long <- physio_region |>
+  pivot_longer(
+    cols = c(temp_c, salinity_psu, secchi_m),
+    names_to = "parameter",
+    values_to = "value"
+  )
+
+ggplot(
+  physio_region_long,
+  aes(x = Date, y = value, colour = region, group = region)
+) +
+  geom_line() +
+  facet_wrap(~ parameter, scales = "free_y", ncol = 1) +
+  labs(
+    title = "Regional water quality over time",
+    x = "Date",
+    y = "Value",
+    colour = "Region"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
