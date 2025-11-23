@@ -337,6 +337,10 @@ p1 <- ggplot(zoop_region_daily, aes(sample_date, zoop_total, color = region)) +
   geom_line() + geom_point(size = 0.8) +
   labs(title = "Zooplankton abundance over time (by region)",
        x = "Date", y = "Total zooplankton") +
+        scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m")+ 
   x_scale + common_theme
 
 # 2) Zooplankton richness (by region)
@@ -344,6 +348,10 @@ p2 <- ggplot(zoop_region_daily, aes(sample_date, zoop_richness, color = region))
   geom_line() + geom_point(size = 0.8) +
   labs(title = "Zooplankton richness over time (by region)",
        x = "Date", y = "Number of taxa") +
+        scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m")+ 
   x_scale + common_theme
 
 # 3) Phytoplankton abundance (by region)
@@ -351,6 +359,10 @@ p3 <- ggplot(phyto_region_daily, aes(sample_date, phyto_total, color = region)) 
   geom_line() + geom_point(size = 0.8) +
   labs(title = "Phytoplankton abundance over time (by region)",
        x = "Date", y = "Total phytoplankton (cells)") +
+        scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m")+ 
   x_scale + common_theme
 
 # 4) Phytoplankton richness (by region)
@@ -358,6 +370,10 @@ p4 <- ggplot(phyto_region_daily, aes(sample_date, phyto_richness, color = region
   geom_line() + geom_point(size = 0.8) +
   labs(title = "Phytoplankton richness over time (by region)",
        x = "Date", y = "Number of taxa") +
+        scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m")+ 
   x_scale + common_theme
 
 # print
@@ -378,6 +394,10 @@ ggplot(zoop_sampling, aes(x = sample_date, y = n_samples, color = region)) +
   geom_line() + geom_point(size = 0.8) +
   labs(title = "Zooplankton sampling effort (by region)",
        x = "Date", y = "Number of samples") +
+        scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m")+ 
   scale_x_date(
     date_breaks = "3 months",   # every 3 months
     date_labels = "%Y-%m"       # format like 2018-01, 2018-04, etc
@@ -428,6 +448,10 @@ plot_sites <- function(df, region_pick, yvar, ylab, title,
     scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") +
     labs(title = paste0(title, " — ", region_pick),
          x = "Date", y = ylab) +
+          scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
     theme_minimal(base_size = 11) +
     theme(
       panel.grid.minor = element_blank(),
@@ -736,6 +760,7 @@ ggplot(
 
 ```{r}
 library(dplyr)
+library(ggplot2)
 
 zoop_fg <- zoop |>
   mutate(
@@ -790,6 +815,10 @@ zoop_fg_region <- zoop_fg |>
   group_by(region, sample_date, functional_group) |>
   summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
 
+#for reducing y axis length
+bowen_data <- zoop_fg_region |> filter(region == "Bowen")
+ymax_bowen <- max(bowen_data$total_abundance, na.rm = TRUE) * 1.2
+
 #Plot for Bowen
 ggplot(
   zoop_fg_region |> filter(region == "Bowen"),
@@ -806,9 +835,17 @@ ggplot(
     y = "Total abundance (Orgs)",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  scale_y_continuous(limits = c(0, ymax_bowen)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+#for reducing y axis length
+mackay_data <- zoop_fg_region |> filter(region == "Mackay")
+ymax_mackay <- max(mackay_data$total_abundance, na.rm = TRUE) * 1.2
 #Plot for Mackay
 ggplot(
   zoop_fg_region |> filter(region == "Mackay"),
@@ -825,10 +862,16 @@ ggplot(
     y = "Total abundance (Orgs)",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  scale_y_continuous(limits = c(0, ymax_mackay)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
 
-#Plot for Mackay
+#Plot for weipa
 ggplot(
   zoop_fg_region |> filter(region == "Weipa"),
   aes(x = sample_date,
@@ -844,10 +887,105 @@ ggplot(
     y = "Total abundance (Orgs)",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
+
+
+# region-wise functional group richness for zooplankton:
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# --- assuming zoop_fg (with functional_group) is already created as in your code ---
+
+# 1. Region-wise functional group RICHNESS
+zoop_fg_region_rich <- zoop_fg |>
+  filter(!is.na(taxa), taxa != "") |>
+  group_by(region, sample_date, functional_group) |>
+  summarise(
+    richness = n_distinct(taxa),
+    .groups  = "drop"
+  )
+
+# --------- PLOTS (one per region) ---------
+
+## Bowen
+ggplot(
+  zoop_fg_region_rich |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = richness,
+      colour = functional_group,
+      group  = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Zooplankton functional group richness over time — Bowen",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## Mackay
+ggplot(
+  zoop_fg_region_rich |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = richness,
+      colour = functional_group,
+      group  = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Zooplankton functional group richness over time — Mackay",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## Weipa
+ggplot(
+  zoop_fg_region_rich |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = richness,
+      colour = functional_group,
+      group  = functional_group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Zooplankton functional group richness over time — Weipa",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
 
 # phyto functional group analysis
 # Summarise phyto abundance by functional group, region, and date
@@ -882,6 +1020,10 @@ ggplot(
     y      = "Total cell count",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -902,6 +1044,10 @@ ggplot(
     y      = "Total cell count",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -922,12 +1068,106 @@ ggplot(
     y      = "Total cell count",
     colour = "Functional group"
   ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
-# sitewise functional group timeline graphs (zoop)
+
+# Phytoplankton Functional Group Richness — Region-wise (Time-series)
+```{r}
+# Summarise richness by region, date, and functional group
+library(dplyr)
+
+phyto_fg_region_rich <- phyto |>
+  filter(!is.na(taxa) & taxa != "") |>       # remove blanks
+  group_by(region, sample_date, group) |>
+  summarise(
+    richness = n_distinct(taxa),
+    .groups = "drop"
+  )
+
+# Plot region-wise time-series
+# Bowen
+library(ggplot2)
+
+ggplot(
+  phyto_fg_region_rich |> filter(region == "Bowen"),
+  aes(x = sample_date,
+      y = richness,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton Functional Group Richness Over Time — Bowen",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Mackay
+ggplot(
+  phyto_fg_region_rich |> filter(region == "Mackay"),
+  aes(x = sample_date,
+      y = richness,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton Functional Group Richness Over Time — Mackay",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Weipa
+ggplot(
+  phyto_fg_region_rich |> filter(region == "Weipa"),
+  aes(x = sample_date,
+      y = richness,
+      colour = group,
+      group = group)
+) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title  = "Phytoplankton Functional Group Richness Over Time — Weipa",
+    x      = "Date",
+    y      = "Number of taxa",
+    colour = "Functional group"
+  ) +
+    scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+# sitewise functional group timeline graphs (zoop)(abundance)
 
 ```{r}
 #summarising the dataset
@@ -953,6 +1193,10 @@ plot_site_fg <- function(site_id) {
       y = "Total abundance (Orgs)",
       colour = "Functional group"
     ) +
+      scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
@@ -976,7 +1220,59 @@ for (s in sites) {
 
 ```
 
-# sitewise functional group timeline graphs (phyto)
+# Zooplankton Functional-Group Richness — Sitewise Timeline
+
+```{r}
+# Summarise richness
+zoop_fg_rich_site <- zoop_fg |>
+  filter(!is.na(taxa) & taxa != "") |>          # ensure taxa valid
+  group_by(region, site_code, site_name, sample_date, functional_group) |>
+  summarise(richness = n_distinct(taxa), .groups = "drop")
+
+# Create the plotting function
+plot_site_fg_rich <- function(site_id) {
+  ggplot(
+    zoop_fg_rich_site |> filter(site_code == site_id),
+    aes(x = sample_date,
+        y = richness,
+        colour = functional_group,
+        group = functional_group)
+  ) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title = paste("Zooplankton Functional Group Richness —", site_id),
+      x = "Date",
+      y = "Richness (Number of taxa)",
+      colour = "Functional group"
+    ) +
+      scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Loop through all sites
+
+sites <- c(
+  "AP_AMB1", "AP_AMB2", "AP_AMB3", "AP_AMB4", "AP_AMB5",
+  "MKY_AMB1", "MKY_AMB10", "MKY_AMB11", "MKY_AMB12",
+  "MKY_AMB2", "MKY_AMB3B", "MKY_AMB5", "MKY_AMB6B", "MKY_AMB8",
+  "MKY_CAM1", "MKY_CAM2", "MKY_CAM3",
+  "WP_AMB1", "WP_AMB2", "WP_AMB3", "WP_AMB4", "WP_AMB5"
+)
+
+for (s in sites) {
+  print(paste("Plotting richness for site:", s))
+  print(plot_site_fg_rich(s))
+}
+
+
+```
+
+# sitewise functional group timeline graphs (phyto)(abundance)
 
 ```{r}
 # Summarise phytoplankton by site + functional group
@@ -1009,6 +1305,10 @@ plot_phyto_site_fg <- function(site_id) {
       y = "Total cell count",
       colour = "Functional group"
     ) +
+      scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
@@ -1024,10 +1324,63 @@ for (s in phyto_sites) {
 
 ```
 
+# site-wise functional group richness time series for phytoplankton.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+#---- 1. Summarise phytoplankton richness by site + functional group ----
+# (assuming your taxonomic column is called `taxa` and functional group is `group`)
+
+phyto_fg_site_rich <- phyto |>
+  filter(!is.na(taxa), taxa != "") |>          # keep only real taxa
+  group_by(region, site_code, site_name, sample_date, group) |>
+  summarise(
+    richness = n_distinct(taxa),              # number of unique taxa in that FG
+    .groups = "drop"
+  )
+
+#---- 2. Function to make site-wise functional group richness timelines ----
+
+plot_phyto_site_fg_rich <- function(site_id) {
+  ggplot(
+    phyto_fg_site_rich |> filter(site_code == site_id),
+    aes(x = sample_date,
+        y = richness,
+        colour = group,
+        group = group)
+  ) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title  = paste("Phytoplankton Functional Group Richness —", site_id),
+      x      = "Date",
+      y      = "Number of taxa",
+      colour = "Functional group"
+    ) +
+      scale_x_date(
+  limits = as.Date(c("2018-01-01", "2020-12-31")),
+  date_breaks = "3 months",
+  date_labels = "%Y-%m") + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+#---- 3. Get all sites & plot them ----
+
+phyto_sites <- sort(unique(phyto_fg_site_rich$site_code))
+
+for (s in phyto_sites) {
+  print(paste("Plotting site:", s))
+  print(plot_phyto_site_fg_rich(s))
+}
+
+```
+
+
 # Comparing WaterQuality Data
 # processing physiochem data 
-
-
 ```{r}
 # Which sheet to use & how to read both in R
 
@@ -1039,7 +1392,6 @@ physio_path <- "data/Physiochem Database tables_all_rows(20240902_1226).xlsx"
 field_obs  <- read_excel(physio_path, sheet = "Field_obs(20240902_1226)")
 field_meas <- read_excel(physio_path, sheet = "Field_meas(20240902_1226)")
 
-
 # Combine the sheets & add region
 
 library(dplyr)
@@ -1047,11 +1399,19 @@ library(dplyr)
 # 1. surface-only physio measurements
 meas_surface <- field_meas |>
   filter(Category == "Surface") |>
-  select(Site_code, Date, Temp, EC_mScm, Salinity)  # adjust names if slightly different
+  select(Site_code, Date, Temp, EC_mScm, DO_mgL)  # adjust names if slightly different
 
 # 2. field observations with Secchi
 obs_light <- field_obs |>
   select(Site_code, Date, Secchi)  # keep Secchi as your light variable
+
+#converting both dataset dates into character
+meas_surface <- meas_surface |> 
+  mutate(Date = as.Date(Date))
+
+obs_light <- obs_light |> 
+  mutate(Date = as.Date(Date), 
+  Secchi = as.numeric(Secchi))
 
 # 3. join them together by site + date
 physio_join <- meas_surface |>
@@ -1070,37 +1430,191 @@ physio_region <- physio_join |>
   group_by(region, Date) |>
   summarise(
     temp_c       = mean(Temp,      na.rm = TRUE),
-    salinity_psu = mean(Salinity,  na.rm = TRUE),   # or EC_mScm if that's what you want
+    salinity_psu = mean(EC_mScm,  na.rm = TRUE),   # or EC_mScm if that's what you want
     secchi_m     = mean(Secchi,    na.rm = TRUE),
     .groups = "drop"
   )
 
 # Make a 3-panel region-wise timeline (light, temp, salinity)
 
+
+library(dplyr)
 library(tidyr)
 library(ggplot2)
 
-physio_region_long <- physio_region |>
+# 1. Filter to 2018–2020 and the three regions
+physio_region_18_20 <- physio_region |>
+  filter(
+    Date >= as.Date("2018-01-01"),
+    Date <= as.Date("2020-12-31"),
+    region %in% c("Bowen", "Mackay", "Weipa")
+  )
+
+# 2. Long format for plotting (one column for parameter, one for value)
+physio_region_long <- physio_region_18_20 |>
   pivot_longer(
-    cols = c(temp_c, salinity_psu, secchi_m),
+    cols = c(secchi_m, temp_c, salinity_psu),
     names_to = "parameter",
     values_to = "value"
   )
 
-ggplot(
-  physio_region_long,
-  aes(x = Date, y = value, colour = region, group = region)
-) +
-  geom_line() +
-  facet_wrap(~ parameter, scales = "free_y", ncol = 1) +
-  labs(
-    title = "Regional water quality over time",
-    x = "Date",
-    y = "Value",
-    colour = "Region"
+# 3. Function to plot ONE region at a time
+plot_physio_region <- function(reg_name) {
+  ggplot(
+    physio_region_long |> filter(region == reg_name),
+    aes(x = Date, y = value, colour = parameter, group = parameter)
   ) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    geom_line() +
+    geom_point() +
+    facet_wrap(~ parameter, scales = "free_y", ncol = 1) +
+    labs(
+      title = paste("Water quality over time —", reg_name),
+      x = "Date",
+      y = "Value",
+      colour = "Parameter"
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# 4. Make the three separate graphs
+plot_physio_region("Bowen")
+plot_physio_region("Mackay")
+plot_physio_region("Weipa")
+
+```
+
+# Comparing DO to phyto and zoop total abundance and richness
+
+```{r}
+# Prepare DO time-series by region
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(rlang)   # for sym()
+
+# 1. Region–date summary of DO (mean over depths per day)
+do_region_daily <- physio_join |>
+  group_by(region, Date) |>
+  summarise(DO_mgL = mean(DO_mgL, na.rm = TRUE), .groups = "drop")
+
+# Join DO with your zoop + phyto region tables
+
+# Match column name to join by date
+zoop_do_region <- zoop_region_daily |>
+  rename(Date = sample_date) |>
+  left_join(do_region_daily, by = c("region", "Date"))
+
+phyto_do_region <- phyto_region_daily |>
+  rename(Date = sample_date) |>
+  left_join(do_region_daily, by = c("region", "Date"))
+
+# Helper function: time-series of DO + one plankton metric
+
+plot_do_timeseries <- function(region_name,
+                               df,
+                               response_col,   # e.g. "zoop_total"
+                               response_label, # pretty name for strip
+                               title_suffix) { # e.g. "zooplankton abundance"
+  
+  long_df <- df |>
+    filter(region == region_name) |>
+    select(Date, DO_mgL, !!sym(response_col)) |>
+    rename(Response = !!sym(response_col)) |>
+    pivot_longer(
+      cols = c(DO_mgL, Response),
+      names_to  = "parameter",
+      values_to = "value"
+    ) |>
+    mutate(
+      parameter = dplyr::recode(
+        parameter,
+        DO_mgL   = "Dissolved oxygen (mg/L)",
+        Response = response_label
+      )
+    )
+  
+  ggplot(long_df, aes(x = Date, y = value)) +
+    geom_line() +
+    geom_point(size = 0.8) +
+    facet_wrap(~ parameter, ncol = 1, scales = "free_y") +
+    labs(
+      title = paste(region_name, "— DO vs", title_suffix),
+      x = "Date",
+      y = "Value"
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
 
 
+# Generate the 12 plots
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+# Bowen
+# 1. DO vs zoop abundance
+plot_do_timeseries("Bowen",
+                   zoop_do_region,
+                   response_col   = "zoop_total",
+                   response_label = "Zooplankton abundance (orgs)",
+                   title_suffix   = "zooplankton abundance")
+
+# 2. DO vs zoop richness
+plot_do_timeseries("Bowen",
+                   zoop_do_region,
+                   response_col   = "zoop_richness",
+                   response_label = "Zooplankton richness (taxa)",
+                   title_suffix   = "zooplankton richness")
+
+# 3. DO vs phyto abundance
+plot_do_timeseries("Bowen",
+                   phyto_do_region,
+                   response_col   = "phyto_total",
+                   response_label = "Phytoplankton abundance (cells)",
+                   title_suffix   = "phytoplankton abundance")
+
+# 4. DO vs phyto richness
+plot_do_timeseries("Bowen",
+                   phyto_do_region,
+                   response_col   = "phyto_richness",
+                   response_label = "Phytoplankton richness (taxa)",
+                   title_suffix   = "phytoplankton richness")
+
+# Mackay
+plot_do_timeseries("Mackay", zoop_do_region,
+                   "zoop_total",   "Zooplankton abundance (orgs)",
+                   "zooplankton abundance")
+
+plot_do_timeseries("Mackay", zoop_do_region,
+                   "zoop_richness","Zooplankton richness (taxa)",
+                   "zooplankton richness")
+
+plot_do_timeseries("Mackay", phyto_do_region,
+                   "phyto_total",  "Phytoplankton abundance (cells)",
+                   "phytoplankton abundance")
+
+plot_do_timeseries("Mackay", phyto_do_region,
+                   "phyto_richness","Phytoplankton richness (taxa)",
+                   "phytoplankton richness")
+
+# Weipa
+
+plot_do_timeseries("Weipa", zoop_do_region,
+                   "zoop_total",   "Zooplankton abundance (orgs)",
+                   "zooplankton abundance")
+
+plot_do_timeseries("Weipa", zoop_do_region,
+                   "zoop_richness","Zooplankton richness (taxa)",
+                   "zooplankton richness")
+
+plot_do_timeseries("Weipa", phyto_do_region,
+                   "phyto_total",  "Phytoplankton abundance (cells)",
+                   "phytoplankton abundance")
+
+plot_do_timeseries("Weipa", phyto_do_region,
+                   "phyto_richness","Phytoplankton richness (taxa)",
+                   "phytoplankton richness")
+
+# correct this code.
 ```
