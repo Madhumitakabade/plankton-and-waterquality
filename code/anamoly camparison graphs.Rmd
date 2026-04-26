@@ -1,0 +1,40 @@
+---
+title: "anomaly comparison graphs"
+author: "Madhumita Kabade"
+date: "2026-04-26"
+output: html_document
+---
+
+# Description:
+#This file is used to prepare and analyse environmental water-quality data
+#for anomaly comparison graphs across the three study regions: Bowen, Mackay, and Weipa. The main aim is to build a clean merged dataset containing key physicochemical variables such as temperature, dissolved oxygen, pH, Secchi, salinity, total nitrogen (TN), total phosphorus (TP), and chlorophyll-a together with date, site, region, and seasonal information.
+
+#The workflow in this file will focus on:
+#1. cleaning and organising field and lab-based water-quality datasets
+#2. creating time-related columns such as year, month, and wet/dry season
+#3. summarising environmental variables at the chosen temporal and regional scale
+#4. calculating anomalies relative to long-term or study-period means
+#5. producing region-wise anomaly comparison graphs to examine how environmental conditions vary through time. 
+
+#These outputs will be used to compare environmental patterns across regions and to support later interpretation of plankton richness, abundance, and community changes in relation to water quality.
+
+# Reading the Physiochem Database File
+
+```{r}
+library(readxl)
+library(dplyr)
+library(lubridate)
+
+#Read
+excel_sheets("data/Physiochem Database tables_all_rows(20240902_1226).xlsx")
+
+#Run
+field_meas_raw <- read_excel(
+  "data/Physiochem Database tables_all_rows(20240902_1226).xlsx",
+  sheet = "Field_meas(20240902_1226)"
+)
+
+#Inspect
+glimpse(field_meas_raw)
+unique(field_meas_raw$Site_code)
+```

@@ -1618,3 +1618,1350 @@ plot_do_timeseries("Weipa", phyto_do_region,
 
 # correct this code.
 ```
+
+# Stcked BarPlots
+#Functional group distribution
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others (merged)
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea"
+      ) ~ "Larval Forms",
+
+       # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+# ------------------------------------------------------------
+# 2) Aggregate to month (monthly totals by region x functional group)
+# ------------------------------------------------------------
+zoop_fg_month <- zoop_fg %>%
+  mutate(
+    sample_date = as.Date(sample_date),
+    month = floor_date(sample_date, unit = "month")
+    # If lubridate gives an error, replace line above with:
+    # month = as.Date(format(sample_date, "%Y-%m-01"))
+  ) %>%
+  filter(!is.na(month), !is.na(orgs), !is.na(region), !is.na(functional_group)) %>%
+  group_by(region, month, functional_group) %>%
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop")
+
+# Optional: set a consistent functional-group stacking order
+fg_order <- c(
+  "Protists (Microzooplankton)",
+  "Other Crustaceans",
+  "Larval Forms",
+  "Gelatinous & Others",
+  "Copepods",
+  "Unassigned"
+)
+
+# ============================================================
+# DIRECTION 1: EQUAL-SPACING (SAMPLED MONTHS ONLY)
+# ============================================================
+# Cleanest for presentation. Bars are evenly spaced, labels show sampled months.
+# NOTE: spacing is not proportional to time (but months are shown honestly in labels).
+
+plot_zoop_monthly_equal_spacing <- function(df, region_name, percent = TRUE) {
+
+  dat <- df %>%
+    filter(region == region_name) %>%
+    mutate(
+      month = as.Date(month),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    filter(!is.na(month), !is.na(total_abundance), !is.na(functional_group)) %>%
+    arrange(month)
+
+  if (nrow(dat) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  month_levels <- dat %>%
+    distinct(month) %>%
+    arrange(month) %>%
+    mutate(month_label = format(month, "%Y-%m"))
+
+  dat <- dat %>%
+    mutate(month_label = format(month, "%Y-%m"))
+
+  p <- ggplot(
+    dat,
+    aes(
+      x = factor(month_label, levels = month_levels$month_label),
+      y = total_abundance,
+      fill = functional_group
+    )
+  ) +
+    geom_col(
+      width = 0.75,
+      position = if (percent) "fill" else "stack"
+    ) +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " Over Time (Monthly) — ", region_name
+      ),
+      subtitle = "Sampled months only (equal spacing for readability)",
+      x = "Sampling month",
+      y = ifelse(percent, "Proportion", "Total abundance"),
+      fill = "Functional group"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    ymax <- max(dat$total_abundance, na.rm = TRUE) * 1.35
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ============================================================
+# DIRECTION 2: COMPLETE MONTHLY TIMELINE (ALL MONTHS SHOWN)
+# ============================================================
+# Keeps real calendar spacing. Missing months are added with zero height.
+# NOTE: months without bars may reflect no sampling.
+
+plot_zoop_monthly_complete_timeline <- function(df, region_name, percent = TRUE) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(
+      month = as.Date(month),
+      functional_group = as.character(functional_group)
+    ) %>%
+    filter(!is.na(month), !is.na(total_abundance), !is.na(functional_group)) %>%
+    arrange(month)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  # Full month sequence for this region
+  full_months <- seq.Date(
+    from = min(dat_obs$month, na.rm = TRUE),
+    to   = max(dat_obs$month, na.rm = TRUE),
+    by   = "month"
+  )
+
+  # Use all groups in order (keeps legend/stacking consistent)
+  groups_use <- fg_order[fg_order %in% unique(df$functional_group)]
+
+  dat_complete <- tidyr::expand_grid(
+    month = full_months,
+    functional_group = groups_use
+  ) %>%
+    left_join(
+      dat_obs %>% select(month, functional_group, total_abundance),
+      by = c("month", "functional_group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_abundance = ifelse(is.na(total_abundance), 0, total_abundance),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    arrange(month, functional_group)
+
+  p <- ggplot(
+    dat_complete,
+    aes(x = month, y = total_abundance, fill = functional_group)
+  ) +
+    geom_col(
+      width = 25,
+      position = if (percent) "fill" else "stack"
+    ) +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " Over Time (Monthly) — ", region_name
+      ),
+      subtitle = "Complete monthly timeline (months without bars may reflect no sampling)",
+      x = "Month",
+      y = ifelse(percent, "Proportion", "Total abundance"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      date_breaks = "6 months",
+      date_labels = "%Y-%m"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    ymax <- max(dat_complete$total_abundance, na.rm = TRUE) * 1.35
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 3) RUN PLOTS (ZOOP ONLY)
+# ------------------------------------------------------------
+
+regions_zoop <- sort(unique(zoop_fg_month$region))
+
+# ---- Direction 1 (Equal spacing), 100% stacked composition ----
+for (r in regions_zoop) {
+  print(plot_zoop_monthly_equal_spacing(zoop_fg_month, region_name = r, percent = TRUE))
+}
+
+# ---- Direction 2 (Complete timeline), 100% stacked composition ----
+for (r in regions_zoop) {
+  print(plot_zoop_monthly_complete_timeline(zoop_fg_month, region_name = r, percent = TRUE))
+}
+
+```
+
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others (merged)
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea"
+      ) ~ "Larval Forms",
+
+       # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+# ------------------------------------------------------------
+# 2) Consistent functional-group order for legend/stacking
+# ------------------------------------------------------------
+fg_order <- c(
+  "Protists (Microzooplankton)",
+  "Other Crustaceans",
+  "Larval Forms",
+  "Gelatinous & Others",
+  "Copepods",
+  "Unassigned"
+)
+
+# ------------------------------------------------------------
+# 3) Create 6-month bins (Jan-Jun = H1, Jul-Dec = H2)
+# ------------------------------------------------------------
+zoop_6m_base <- zoop_fg %>%
+  mutate(
+    sample_date = as.Date(sample_date),
+    year = year(sample_date),
+    month_num = month(sample_date),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_start = as.Date(if_else(
+      month_num <= 6,
+      paste0(year, "-01-01"),
+      paste0(year, "-07-01")
+    )),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  filter(!is.na(sample_date), !is.na(region), !is.na(taxa))
+
+# ------------------------------------------------------------
+# 4) Semi-annual abundance by functional group (STACKED)
+# ------------------------------------------------------------
+zoop_abund_6m_fg <- zoop_6m_base %>%
+  filter(!is.na(orgs), !is.na(functional_group)) %>%
+  group_by(region, bin_start, bin_label, functional_group) %>%
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop") %>%
+  mutate(functional_group = factor(functional_group, levels = fg_order))
+
+# ------------------------------------------------------------
+# 5) Semi-annual richness (TOTAL richness per bin, NOT stacked)
+#    Here richness = number of unique taxa observed in each 6-month bin
+# ------------------------------------------------------------
+zoop_richness_6m <- zoop_6m_base %>%
+  filter(!is.na(taxa)) %>%
+  group_by(region, bin_start, bin_label) %>%
+  summarise(total_richness = n_distinct(taxa), .groups = "drop")
+
+# ------------------------------------------------------------
+# 6) Plot function: stacked abundance / stacked composition (6-month timeline)
+# ------------------------------------------------------------
+plot_zoop_6m_stacked <- function(df, region_name, percent = FALSE) {
+  
+  dat <- df %>%
+    filter(region == region_name) %>%
+    arrange(bin_start)
+  
+  if (nrow(dat) == 0) stop(paste("No valid rows found for region:", region_name))
+  
+  ymax <- max(dat$total_abundance, na.rm = TRUE) * 1.35
+  
+  p <- ggplot(dat, aes(x = bin_start, y = total_abundance, fill = functional_group)) +
+    geom_col(
+      width = 150,  # ~6 months wide on Date scale
+      position = if (percent) "fill" else "stack"
+    ) +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Bars represent Jan-Jun and Jul-Dec aggregated observations",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion", "Total abundance (orgs)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      date_breaks = "6 months",
+      date_labels = "%Y-%m"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+  
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+  
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 7) Plot function: total richness bars (NOT stacked, 6-month timeline)
+# ------------------------------------------------------------
+plot_zoop_6m_richness <- function(df, region_name) {
+  
+  dat <- df %>%
+    filter(region == region_name) %>%
+    arrange(bin_start)
+  
+  if (nrow(dat) == 0) stop(paste("No valid rows found for region:", region_name))
+  
+  ymax <- max(dat$total_richness, na.rm = TRUE) * 1.35
+  
+  p <- ggplot(dat, aes(x = bin_start, y = total_richness)) +
+    geom_col(width = 150) +
+    labs(
+      title = paste0("Zooplankton Total Richness (6-Month Aggregated) — ", region_name),
+      subtitle = "Total unique taxa observed per 6-month period (Jan-Jun, Jul-Dec)",
+      x = "6-month period",
+      y = "Total richness (number of taxa)"
+    ) +
+    scale_x_date(
+      date_breaks = "6 months",
+      date_labels = "%Y-%m"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    ) +
+    coord_cartesian(ylim = c(0, ymax))
+  
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 8) RUN ALL ZOOP 6-MONTH PLOTS (region-wise)
+# ------------------------------------------------------------
+regions_zoop <- sort(unique(zoop_6m_base$region))
+
+# A) Stacked absolute abundance (drops in counts + composition by counts)
+for (r in regions_zoop) {
+  print(plot_zoop_6m_stacked(zoop_abund_6m_fg, region_name = r, percent = FALSE))
+}
+
+# B) 100% stacked composition (clean composition comparison)
+for (r in regions_zoop) {
+  print(plot_zoop_6m_stacked(zoop_abund_6m_fg, region_name = r, percent = TRUE))
+}
+
+# C) Total richness bars (NOT stacked; best for showing richness drops)
+for (r in regions_zoop) {
+  print(plot_zoop_6m_richness(zoop_richness_6m, region_name = r))
+}
+
+```
+
+
+#
+#### Semi final code for stacked bar plots for aggregated  and stacked percent. (abundance only)
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others (merged)
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea"
+      ) ~ "Larval Forms",
+
+       # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+# ------------------------------------------------------------
+# 2) Consistent functional-group order (legend + stack order)
+# ------------------------------------------------------------
+fg_order <- c(
+  "Protists (Microzooplankton)",
+  "Other Crustaceans",
+  "Larval Forms",
+  "Gelatinous & Others",
+  "Copepods",
+  "Unassigned"
+)
+
+# ------------------------------------------------------------
+# 3) Create 6-month bins (Jan-Jun = H1, Jul-Dec = H2)
+#    and FILTER to start from 2018-01
+# ------------------------------------------------------------
+zoop_6m_base <- zoop_fg %>%
+  mutate(
+    sample_date = as.Date(sample_date)
+  ) %>%
+  filter(!is.na(sample_date)) %>%
+  filter(sample_date >= as.Date("2018-01-01")) %>%   # <- force start from 2018-01
+  mutate(
+    year = year(sample_date),
+    month_num = month(sample_date),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_start = as.Date(if_else(
+      month_num <= 6,
+      paste0(year, "-01-01"),
+      paste0(year, "-07-01")
+    )),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  filter(!is.na(region), !is.na(taxa))
+
+# ------------------------------------------------------------
+# 4) Semi-annual abundance by functional group (STACKED)
+# ------------------------------------------------------------
+zoop_abund_6m_fg <- zoop_6m_base %>%
+  filter(!is.na(orgs), !is.na(functional_group)) %>%
+  group_by(region, bin_start, bin_label, functional_group) %>%
+  summarise(total_abundance = sum(orgs, na.rm = TRUE), .groups = "drop") %>%
+  mutate(functional_group = factor(functional_group, levels = fg_order))
+
+# ------------------------------------------------------------
+# 5) Create a COMMON 6-month timeline for all regions (from 2018-01)
+#    This ensures Weipa also shows the 2018-01 bin on the axis.
+# ------------------------------------------------------------
+common_start <- as.Date("2018-01-01")
+
+# End at the latest observed 6-month bin in your filtered dataset
+common_end <- max(zoop_abund_6m_fg$bin_start, na.rm = TRUE)
+
+# Generate 6-month bin starts: 2018-01-01, 2018-07-01, 2019-01-01, ...
+common_bins <- seq.Date(from = common_start, to = common_end, by = "6 months")
+
+# Keep labels for those bins
+common_bins_tbl <- tibble(bin_start = common_bins) %>%
+  mutate(
+    year = year(bin_start),
+    month_num = month(bin_start),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  select(bin_start, bin_label)
+
+# ------------------------------------------------------------
+# 6) Plot function: 6-month timeline (TRUE calendar spacing)
+#    Completes missing 6-month bins with zeros so all regions share same timeline.
+# ------------------------------------------------------------
+plot_zoop_6m_timeline <- function(df, region_name, percent = TRUE) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(functional_group = as.character(functional_group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  # Complete all 6-month bins x functional groups for this region
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    functional_group = fg_order
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, functional_group, total_abundance),
+      by = c("bin_start", "functional_group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_abundance = ifelse(is.na(total_abundance), 0, total_abundance),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    arrange(bin_start, functional_group)
+
+  ymax <- max(dat_complete$total_abundance, na.rm = TRUE) * 3.00
+
+  p <- ggplot(dat_complete, aes(x = bin_start, y = total_abundance, fill = functional_group)) +
+    geom_col(
+      width = 150,   # ~6-month width
+      position = if (percent) "fill" else "stack"
+    ) +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Common 6-month timeline from 2018-01 (Jan-Jun, Jul-Dec bins)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion", "Total abundance (orgs)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      breaks = common_bins_tbl$bin_start,
+      labels = format(common_bins_tbl$bin_start, "%Y-%m")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 7) Plot function: 6-month EQUAL-SPACING (cleaner presentation)
+#    Also uses the same common bins from 2018-01 across regions.
+# ------------------------------------------------------------
+plot_zoop_6m_equal_spacing <- function(df, region_name, percent = TRUE) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(functional_group = as.character(functional_group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  # Complete all 6-month bins x functional groups for this region
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    functional_group = fg_order
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, functional_group, total_abundance),
+      by = c("bin_start", "functional_group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_abundance = ifelse(is.na(total_abundance), 0, total_abundance),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    arrange(bin_start, functional_group)
+
+  ymax <- max(dat_complete$total_abundance, na.rm = TRUE) * 1.35
+
+  # Use shorter labels for cleaner x-axis
+  dat_complete <- dat_complete %>%
+    mutate(bin_label_short = paste0(year(bin_start), "-", ifelse(month(bin_start) == 1, "H1", "H2")))
+
+  bin_levels <- dat_complete %>%
+    distinct(bin_start, bin_label_short) %>%
+    arrange(bin_start)
+
+  p <- ggplot(
+    dat_complete,
+    aes(
+      x = factor(bin_label_short, levels = bin_levels$bin_label_short),
+      y = total_abundance,
+      fill = functional_group
+    )
+  ) +
+    geom_col(
+      width = 0.75,
+      position = if (percent) "fill" else "stack"
+    ) +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Common 6-month bins from 2018-01 (equal spacing for readability)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion", "Total abundance (orgs)"),
+      fill = "Functional group"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 8) RUN ALL ZOOP 6-MONTH PLOTS (region-wise)
+# ------------------------------------------------------------
+regions_zoop <- sort(unique(zoop_6m_base$region))
+
+# A) Stacked absolute abundance (6-month bins)
+for (r in regions_zoop) {
+  print(plot_zoop_6m_timeline(zoop_abund_6m_fg, region_name = r, percent = FALSE))
+}
+
+# B) 100% stacked composition (6-month bins)
+for (r in regions_zoop) {
+  print(plot_zoop_6m_timeline(zoop_abund_6m_fg, region_name = r, percent = TRUE))
+}
+
+# ------------------------------------------------------------
+# OPTIONAL: cleaner presentation version with equal spacing
+# Uncomment if you want to compare
+# ------------------------------------------------------------
+# for (r in regions_zoop) {
+#   print(plot_zoop_6m_equal_spacing(zoop_abund_6m_fg, region_name = r, percent = TRUE))
+# }
+# for (r in regions_zoop) {
+#   print(plot_zoop_6m_equal_spacing(zoop_abund_6m_fg, region_name = r, percent = FALSE))
+# }
+
+
+```
+
+# Richness plots (stacked percent and aggregate abundance)- Zoop
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+
+zoop_fg <- zoop |>
+  mutate(
+    functional_group = case_when(
+      # 1. Copepods
+      taxa %in% c(
+        "Acartia pacifica", "Acrocalanus gibber", "Calanopia elliptica",
+        "Centropages furcatus", "Farranula sp", "Farranula spp",
+        "Microsetella rosea", "Oncaea venusta", "Oithona sp",
+        "Pseudevadne sp", "Evadne spp"
+      ) ~ "Copepods",
+
+      # 2. Other Crustaceans
+      taxa %in% c(
+        "Portunidae", "Penaeus spp", "Penaeus sp",
+        "Porcellanidae sp", "Porcellanidae spp",
+        "Gammaridea", "Isopoda",
+        "Caprella sp", "Caprella spp",
+        "Bathyporeia sp", "Bathyporeia spp",
+        "Stomatopoda", "Astacidea", "Panulirus sp",
+        "Thecostraca", "Lucifer penicillifer"
+      ) ~ "Other Crustaceans",
+
+      # 3. Gelatinous & Others (merged)
+      taxa %in% c(
+        "Salpa sp", "Salpa spp", "Thalia sp",
+        "Bolinopsis sp", "Doliolum sp", "Siphonophorae",
+        "Oikopleura dioica", "Flaccisagitta enflata",
+        "Cephalapoda", "Gastropoda"
+      ) ~ "Gelatinous & Others",
+
+      # 4. Larval Forms
+      taxa %in% c(
+        "Larval fish & eggs", "Polychaete", "Polychaeta",
+        "Polycheate", "Cnidarian larvae", "Echinoidea"
+      ) ~ "Larval Forms",
+
+       # 5. Protists (Microzooplankton)
+      taxa %in% c(
+        "Acanthometra sp", "Acanthometra spp",
+        "Dictyocysta sp", "Dictyocysta spp",
+        "Favella serrata",
+        "Tintinnopsis sp", "Tintinnopsis spp"
+      ) ~ "Protists (Microzooplankton)",
+
+      # anything not matched above
+      TRUE ~ "Unassigned"
+    )
+  )
+
+# ------------------------------------------------------------
+# 2) Consistent functional-group order (legend + stack order)
+# ------------------------------------------------------------
+fg_order <- c(
+  "Protists (Microzooplankton)",
+  "Other Crustaceans",
+  "Larval Forms",
+  "Gelatinous & Others",
+  "Copepods",
+  "Unassigned"
+)
+
+# ------------------------------------------------------------
+# 3) Create 6-month bins (Jan-Jun = H1, Jul-Dec = H2)
+#    and FILTER to start from 2018-01
+# ------------------------------------------------------------
+zoop_6m_base <- zoop_fg %>%
+  mutate(
+    sample_date = as.Date(sample_date)
+  ) %>%
+  filter(!is.na(sample_date)) %>%
+  filter(sample_date >= as.Date("2018-01-01")) %>%   # <- force start from 2018-01
+  mutate(
+    year = year(sample_date),
+    month_num = month(sample_date),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_start = as.Date(if_else(
+      month_num <= 6,
+      paste0(year, "-01-01"),
+      paste0(year, "-07-01")
+    )),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  filter(!is.na(region), !is.na(taxa))
+
+# ------------------------------------------------------------
+# 5) Semi-annual RICHNESS by functional group (STACKED)
+#    Richness = number of unique taxa per 6-month bin per FG
+# ------------------------------------------------------------
+zoop_rich_6m_fg <- zoop_6m_base %>%
+  filter(!is.na(functional_group), !is.na(taxa)) %>%
+  group_by(region, bin_start, bin_label, functional_group) %>%
+  summarise(total_richness = n_distinct(taxa), .groups = "drop") %>%
+  mutate(functional_group = factor(functional_group, levels = fg_order))
+
+# ------------------------------------------------------------
+# 6) Create a COMMON 6-month timeline for all regions (from 2018-01)
+# ------------------------------------------------------------
+common_start <- as.Date("2018-01-01")
+common_end <- max(zoop_abund_6m_fg$bin_start, na.rm = TRUE)
+
+common_bins <- seq.Date(from = common_start, to = common_end, by = "6 months")
+
+common_bins_tbl <- tibble(bin_start = common_bins) %>%
+  mutate(
+    year = year(bin_start),
+    month_num = month(bin_start),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  select(bin_start, bin_label)
+
+# ------------------------------------------------------------
+# 7) Plot functions (timeline completed with zeros)
+# ------------------------------------------------------------
+plot_zoop_6m_abundance_timeline <- function(df, region_name, percent = TRUE, y_expand = 3.00) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(functional_group = as.character(functional_group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    functional_group = fg_order
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, functional_group, total_abundance),
+      by = c("bin_start", "functional_group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_abundance = ifelse(is.na(total_abundance), 0, total_abundance),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    arrange(bin_start, functional_group)
+
+  ymax <- max(dat_complete$total_abundance, na.rm = TRUE) * y_expand
+
+  p <- ggplot(dat_complete, aes(x = bin_start, y = total_abundance, fill = functional_group)) +
+    geom_col(width = 150, position = if (percent) "fill" else "stack") +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Common 6-month timeline from 2018-01 (Jan-Jun, Jul-Dec bins)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion", "Total abundance (orgs)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      breaks = common_bins_tbl$bin_start,
+      labels = format(common_bins_tbl$bin_start, "%Y-%m")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+plot_zoop_6m_richness_timeline <- function(df, region_name, percent = TRUE, y_expand = 3.00) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(functional_group = as.character(functional_group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    functional_group = fg_order
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, functional_group, total_richness),
+      by = c("bin_start", "functional_group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_richness = ifelse(is.na(total_richness), 0, total_richness),
+      functional_group = factor(functional_group, levels = fg_order)
+    ) %>%
+    arrange(bin_start, functional_group)
+
+  ymax <- max(dat_complete$total_richness, na.rm = TRUE) * y_expand
+
+  p <- ggplot(dat_complete, aes(x = bin_start, y = total_richness, fill = functional_group)) +
+    geom_col(width = 150, position = if (percent) "fill" else "stack") +
+    labs(
+      title = paste0(
+        "Zooplankton Functional Group ",
+        ifelse(percent, "Richness Composition", "Richness"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Richness = number of unique taxa per 6-month period (Jan-Jun, Jul-Dec)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion of richness", "Total richness (unique taxa)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      breaks = common_bins_tbl$bin_start,
+      labels = format(common_bins_tbl$bin_start, "%Y-%m")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 8) RUN ALL PLOTS (region-wise)
+# ------------------------------------------------------------
+regions_zoop <- sort(unique(zoop_6m_base$region))
+
+# C) RICHNESS: absolute stacked
+for (r in regions_zoop) {
+  print(plot_zoop_6m_richness_timeline(zoop_rich_6m_fg, region_name = r, percent = FALSE, y_expand = 4.00))
+}
+
+# D) RICHNESS: 100% stacked composition
+for (r in regions_zoop) {
+  print(plot_zoop_6m_richness_timeline(zoop_rich_6m_fg, region_name = r, percent = TRUE))
+}
+
+```
+
+# Satcked graphs Phyto for Richness
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+# ------------------------------------------------------------
+# 1) Clean and prepare phyto data
+# ------------------------------------------------------------
+phyto_6m_base <- phyto %>%
+  mutate(
+    sample_date = as.Date(sample_date),
+    group = as.character(group)
+  ) %>%
+  filter(!is.na(sample_date)) %>%
+  filter(sample_date >= as.Date("2018-01-01")) %>%
+  mutate(
+    year = year(sample_date),
+    month_num = month(sample_date),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_start = as.Date(if_else(
+      month_num <= 6,
+      paste0(year, "-01-01"),
+      paste0(year, "-07-01")
+    )),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  filter(!is.na(region), !is.na(taxa), !is.na(group))
+
+# ------------------------------------------------------------
+# 2) Functional-group order
+#    You can edit this order if you want a different legend/stack order
+# ------------------------------------------------------------
+fg_order_phyto <- phyto_6m_base %>%
+  distinct(group) %>%
+  arrange(group) %>%
+  pull(group)
+
+# ------------------------------------------------------------
+# 3) Semi-annual RICHNESS by functional group
+#    Richness = number of unique taxa per 6-month bin per group
+# ------------------------------------------------------------
+phyto_rich_6m_fg <- phyto_6m_base %>%
+  group_by(region, bin_start, bin_label, group) %>%
+  summarise(total_richness = n_distinct(taxa), .groups = "drop") %>%
+  mutate(group = factor(group, levels = fg_order_phyto))
+
+# ------------------------------------------------------------
+# 4) Common 6-month timeline for all regions
+# ------------------------------------------------------------
+common_start <- as.Date("2018-01-01")
+common_end <- max(phyto_rich_6m_fg$bin_start, na.rm = TRUE)
+
+common_bins <- seq.Date(from = common_start, to = common_end, by = "6 months")
+
+common_bins_tbl <- tibble(bin_start = common_bins) %>%
+  mutate(
+    year = year(bin_start),
+    month_num = month(bin_start),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  select(bin_start, bin_label)
+
+# ------------------------------------------------------------
+# 5) Plot function for phyto richness
+# ------------------------------------------------------------
+plot_phyto_6m_richness_timeline <- function(df, region_name, percent = TRUE, y_expand = 3.00) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(group = as.character(group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    group = fg_order_phyto
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, group, total_richness),
+      by = c("bin_start", "group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_richness = ifelse(is.na(total_richness), 0, total_richness),
+      group = factor(group, levels = fg_order_phyto)
+    ) %>%
+    arrange(bin_start, group)
+
+  ymax <- max(dat_complete$total_richness, na.rm = TRUE) * y_expand
+
+  p <- ggplot(dat_complete, aes(x = bin_start, y = total_richness, fill = group)) +
+    geom_col(width = 150, position = if (percent) "fill" else "stack") +
+    labs(
+      title = paste0(
+        "Phytoplankton Functional Group ",
+        ifelse(percent, "Richness Composition", "Richness"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Richness = number of unique taxa per 6-month period (Jan-Jun, Jul-Dec)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion of richness", "Total richness (unique taxa)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      breaks = common_bins_tbl$bin_start,
+      labels = format(common_bins_tbl$bin_start, "%Y-%m")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 6) Run all plots region-wise
+# ------------------------------------------------------------
+regions_phyto <- sort(unique(phyto_6m_base$region))
+
+# Absolute stacked richness
+for (r in regions_phyto) {
+  print(plot_phyto_6m_richness_timeline(
+    phyto_rich_6m_fg,
+    region_name = r,
+    percent = FALSE,
+    y_expand = 4.00
+  ))
+}
+
+# 100% stacked richness composition
+for (r in regions_phyto) {
+  print(plot_phyto_6m_richness_timeline(
+    phyto_rich_6m_fg,
+    region_name = r,
+    percent = TRUE
+  ))
+}
+```
+
+# Satcked graphs Phyto for Abundance
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(scales)
+library(forcats)
+
+# ------------------------------------------------------------
+# 1) Clean and prepare phyto data
+# ------------------------------------------------------------
+phyto_6m_base <- phyto %>%
+  mutate(
+    sample_date = as.Date(sample_date),
+    group = as.character(group)
+  ) %>%
+  filter(!is.na(sample_date)) %>%
+  filter(sample_date >= as.Date("2018-01-01")) %>%
+  mutate(
+    year = year(sample_date),
+    month_num = month(sample_date),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_start = as.Date(if_else(
+      month_num <= 6,
+      paste0(year, "-01-01"),
+      paste0(year, "-07-01")
+    )),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  filter(!is.na(region), !is.na(taxa), !is.na(group))
+
+# ------------------------------------------------------------
+# 2) Functional-group order
+# ------------------------------------------------------------
+fg_order_phyto <- phyto_6m_base %>%
+  distinct(group) %>%
+  arrange(group) %>%
+  pull(group)
+
+# ------------------------------------------------------------
+# 3) Semi-annual ABUNDANCE by functional group
+#    Abundance = sum of cell_count per 6-month bin per group
+# ------------------------------------------------------------
+phyto_abund_6m_fg <- phyto_6m_base %>%
+  filter(!is.na(cell_count)) %>%
+  group_by(region, bin_start, bin_label, group) %>%
+  summarise(total_abundance = sum(cell_count, na.rm = TRUE), .groups = "drop") %>%
+  mutate(group = factor(group, levels = fg_order_phyto))
+
+# ------------------------------------------------------------
+# 4) Common 6-month timeline for all regions
+# ------------------------------------------------------------
+common_start <- as.Date("2018-01-01")
+common_end <- max(phyto_abund_6m_fg$bin_start, na.rm = TRUE)
+
+common_bins <- seq.Date(from = common_start, to = common_end, by = "6 months")
+
+common_bins_tbl <- tibble(bin_start = common_bins) %>%
+  mutate(
+    year = year(bin_start),
+    month_num = month(bin_start),
+    half = if_else(month_num <= 6, "H1", "H2"),
+    half_label = if_else(month_num <= 6, "Jan-Jun", "Jul-Dec"),
+    bin_label = paste0(year, " ", half, " (", half_label, ")")
+  ) %>%
+  select(bin_start, bin_label)
+
+# ------------------------------------------------------------
+# 5) Plot function for phyto abundance
+# ------------------------------------------------------------
+plot_phyto_6m_abundance_timeline <- function(df, region_name, percent = TRUE, y_expand = 3.00) {
+
+  dat_obs <- df %>%
+    filter(region == region_name) %>%
+    mutate(group = as.character(group)) %>%
+    arrange(bin_start)
+
+  if (nrow(dat_obs) == 0) stop(paste("No valid rows found for region:", region_name))
+
+  dat_complete <- tidyr::expand_grid(
+    bin_start = common_bins_tbl$bin_start,
+    group = fg_order_phyto
+  ) %>%
+    left_join(common_bins_tbl, by = "bin_start") %>%
+    left_join(
+      dat_obs %>% select(bin_start, group, total_abundance),
+      by = c("bin_start", "group")
+    ) %>%
+    mutate(
+      region = region_name,
+      total_abundance = ifelse(is.na(total_abundance), 0, total_abundance),
+      group = factor(group, levels = fg_order_phyto)
+    ) %>%
+    arrange(bin_start, group)
+
+  ymax <- max(dat_complete$total_abundance, na.rm = TRUE) * y_expand
+
+  p <- ggplot(dat_complete, aes(x = bin_start, y = total_abundance, fill = group)) +
+    geom_col(width = 150, position = if (percent) "fill" else "stack") +
+    labs(
+      title = paste0(
+        "Phytoplankton Functional Group ",
+        ifelse(percent, "Composition", "Abundance"),
+        " (6-Month Aggregated) — ", region_name
+      ),
+      subtitle = "Abundance = summed cell count per 6-month period (Jan-Jun, Jul-Dec)",
+      x = "6-month period",
+      y = ifelse(percent, "Proportion", "Total abundance (cell count)"),
+      fill = "Functional group"
+    ) +
+    scale_x_date(
+      breaks = common_bins_tbl$bin_start,
+      labels = format(common_bins_tbl$bin_start, "%Y-%m")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  if (percent) {
+    p <- p + scale_y_continuous(labels = percent_format())
+  } else {
+    p <- p + coord_cartesian(ylim = c(0, ymax))
+  }
+
+  return(p)
+}
+
+# ------------------------------------------------------------
+# 6) Run all plots region-wise
+# ------------------------------------------------------------
+regions_phyto <- sort(unique(phyto_6m_base$region))
+
+# Absolute stacked abundance
+for (r in regions_phyto) {
+  print(plot_phyto_6m_abundance_timeline(
+    phyto_abund_6m_fg,
+    region_name = r,
+    percent = FALSE,
+    y_expand = 4.00
+  ))
+}
+
+# 100% stacked abundance composition
+for (r in regions_phyto) {
+  print(plot_phyto_6m_abundance_timeline(
+    phyto_abund_6m_fg,
+    region_name = r,
+    percent = TRUE
+  ))
+}
+```
