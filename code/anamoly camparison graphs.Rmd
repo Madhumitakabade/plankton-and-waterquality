@@ -38,3 +38,165 @@ field_meas_raw <- read_excel(
 glimpse(field_meas_raw)
 unique(field_meas_raw$Site_code)
 ```
+
+# Filtering the Timeline
+
+```{r}
+field_meas_2018_2020 <- field_meas_raw %>%
+  filter(Date >= as.Date("2018-01-01"),
+         Date <= as.Date("2020-06-30"))
+
+range(field_meas_2018_2020$Date)
+nrow(field_meas_2018_2020)
+
+unique(format(field_meas_2018_2020$Date, "%Y"))
+
+anomaly_trial <- field_meas_raw %>%
+  filter(Date >= as.Date("2018-01-01"),
+         Date <= as.Date("2020-06-30"))
+```
+
+# Removing extra sites and adding a region column 
+
+
+```{r}
+sites_keep <- c(
+  # Bowen
+  "AP_AMB1", "AP_AMB2", "AP_AMB3", "AP_AMB4", "AP_AMB5",
+
+  # Mackay
+  "MKY_AMB1", "MKY_AMB2", "MKY_AMB3B", "MKY_AMB5", "MKY_AMB6B",
+  "MKY_AMB8", "MKY_AMB10", "MKY_AMB11", "MKY_AMB12",
+  "MKY_CAM1", "MKY_CAM2", "MKY_CAM3",
+
+  # Weipa
+  "WP_AMB1", "WP_AMB2", "WP_AMB3", "WP_AMB4", "WP_AMB5"
+)
+
+anomaly_trial <- field_meas_raw %>%
+  filter(Date >= as.Date("2018-01-01"),
+         Date <= as.Date("2020-06-30")) %>%
+  filter(Site_code %in% sites_keep)
+
+# check if its working
+
+print(unique(anomaly_trial$Site_code))
+print(nrow(anomaly_trial))
+
+# See how many rows per site
+print(
+  anomaly_trial %>%
+    count(Site_code, sort = TRUE)
+)
+
+# adding region columns
+
+anomaly_trial <- anomaly_trial %>%
+  mutate(
+    region = case_when(
+      grepl("^AP_", Site_code) ~ "Bowen",
+      grepl("^MKY_", Site_code) ~ "Mackay",
+      grepl("^WP_", Site_code) ~ "Weipa",
+      TRUE ~ NA_character_
+    )
+  )
+
+# check if regions are properly mapped
+
+print(
+  anomaly_trial %>%
+    distinct(Site_code, region) %>%
+    arrange(region, Site_code)
+)
+```
+
+# Testing if Secchi has only one value per site+date combination or multiple
+
+```{r}
+field_obs_raw <- read_excel(
+  "data/Physiochem Database tables_all_rows(20240902_1226).xlsx",
+  sheet = "Field_obs(20240902_1226)"
+)
+
+secchi_tbl <- field_obs_raw %>%
+  filter(Date >= as.Date("2018-01-01"),
+         Date <= as.Date("2020-06-30")) %>%
+  filter(Site_code %in% sites_keep) %>%
+  mutate(Date = as.Date(Date)) %>%
+  select(Site_code, Date, Secchi)
+
+secchi_tbl %>%
+  count(Site_code, Date) %>%
+  filter(n > 1)
+
+field_obs_raw %>%
+  mutate(Date = as.Date(Date)) %>%
+  count(Site_code, Date) %>%
+  filter(n > 1)
+
+```
+
+# Adding Secchi to the anamoly_trial databse
+
+```{r}
+# 1. Read field observations
+field_obs_raw <- read_excel(
+  "data/Physiochem Database tables_all_rows(20240902_1226).xlsx",
+  sheet = "Field_obs(20240902_1226)"
+)
+
+# Create secchi_tbl
+secchi_tbl <- field_obs_raw %>%
+  mutate(Date = as.Date(Date)) %>%
+  filter(Date >= as.Date("2018-01-01"),
+         Date <= as.Date("2020-06-30")) %>%
+  filter(Site_code %in% sites_keep) %>%
+  select(Site_code, Date, Secchi)
+
+# Check it looks right
+print(secchi_tbl)
+print(nrow(secchi_tbl))
+
+# Make sure Date in anomaly_trial is also a plain Date
+anomaly_trial <- anomaly_trial %>%
+  mutate(Date = as.Date(Date))
+
+# Join Secchi into anomaly_trial
+anomaly_trial <- anomaly_trial %>%
+  left_join(secchi_tbl, by = c("Site_code", "Date"))
+
+# Check if it worked
+print(names(anomaly_trial))
+print(sum(is.na(anomaly_trial$Secchi)))
+
+# And to see the data
+head(anomaly_trial)
+
+# Check which site-date combinations did not get a Secchi value
+print(
+  anomaly_trial %>%
+    filter(is.na(Secchi)) %>%
+    distinct(Site_code, Date) %>%
+    arrange(Site_code, Date)
+)
+
+cat("n =", nrow(anomaly_trial %>% filter(is.na(Secchi))), "\n")
+
+print(
+  anomaly_trial %>%
+    filter(is.na(Secchi)) %>%
+    arrange(Site_code, Date)
+)
+
+#Download to show Nathan
+library(writexl)
+
+write_xlsx(anomaly_trial,
+           "data/ongoing_trial_anomaly_dataset.xlsx")
+
+
+# removing extra secchi columns
+anomaly_trial <- anomaly_trial %>%
+  select(-starts_with("Secchi."))   # removes Secchi.x, Secchi.y, etc.
+
+```
